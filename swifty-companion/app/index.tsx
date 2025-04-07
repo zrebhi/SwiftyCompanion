@@ -1,6 +1,8 @@
 import { Text, View, StyleSheet, TextInput, Image } from "react-native";
 import { useState } from "react";
 import { FontAwesome } from "@expo/vector-icons";
+import { Link } from "expo-router";
+import { TouchableOpacity } from "react-native-gesture-handler";
 
 import colors from "../constants/colors";
 
@@ -13,13 +15,19 @@ export default function Index() {
         <Image
           source={require("../assets/images/42_logo_white.png")}
           style={styles.logo}
-          resizeMode="contain" />
-        <Text style={styles.title}>Swifty Companion</Text> 
+          resizeMode="contain"
+        />
+        <Text style={styles.title}>Swifty Companion</Text>
       </View>
 
       <View style={styles.searchContainer}>
         <View style={styles.searchBar}>
-          <FontAwesome name="search" size={20} color="gray" style={styles.searchIcon} />
+          <FontAwesome
+            name="search"
+            size={20}
+            color="gray"
+            style={styles.searchIcon}
+          />
           <TextInput
             style={styles.searchInput}
             placeholder="Search for a 42 login..."
@@ -85,5 +93,16 @@ const styles = StyleSheet.create({
     fontSize: 35,
     color: "white",
     fontWeight: "bold",
+  },
+  testButton: {
+    backgroundColor: "#333",
+    padding: 15,
+    borderRadius: 8,
+    marginTop: 20,
+  },
+  testButtonText: {
+    color: "white",
+    fontWeight: "bold",
+    textAlign: "center",
   },
 });
