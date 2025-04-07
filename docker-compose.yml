@@ -1,0 +1,12 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: swifty-companion
+    volumes:
+      - ./swifty-companion:/swifty-companion
+    network_mode: host
+    stdin_open: true
+    tty: true
+    command: bash
