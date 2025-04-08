@@ -18,7 +18,7 @@ echo -e "${YELLOW}Building and starting containers...${NC}"
 docker-compose up -d --build || { echo -e "${RED}Failed to build and start containers${NC}"; exit 1; }
 
 echo -e "${GREEN}Container is running!${NC}"
-echo -e "${BLUE}Starting Expo with tunnel...${NC}"
+echo -e "${BLUE}Starting Expo...${NC}"
 echo -e "${YELLOW}(This might take a moment to start)${NC}"
 
 # Execute the Expo command in the container

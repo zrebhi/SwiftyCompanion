@@ -1,9 +1,9 @@
 /**
  * SwiftyCompanion - Main Search Screen
- * 
+ *
  * This is the landing page of the application where users can search for 42 students
  * by their login. It includes validation, error handling, and navigation to profile pages.
- * 
+ *
  * @module SwiftyCompanion/Search
  */
 
@@ -21,11 +21,11 @@ import { FontAwesome } from "@expo/vector-icons";
 // @ts-expect-error - Expo Router types issue
 import { router } from "expo-router";
 import { TouchableOpacity } from "react-native-gesture-handler";
-import { Formik } from 'formik';
-import * as Yup from 'yup';
+import { Formik } from "formik";
+import * as Yup from "yup";
 
 import colors from "../constants/colors";
-import userService from "../services/userService";
+import userService from "./services/userService";
 
 /**
  * Validation schema for the login search field
@@ -33,26 +33,32 @@ import userService from "../services/userService";
  */
 const LoginSchema = Yup.object().shape({
   login: Yup.string()
-    .required('Please enter a login to search')
-    .matches(/^[a-z0-9_-]{2,20}$/i, 
-      'Login must be 2-20 characters and contain only letters, numbers, underscores, or hyphens')
+    .required("Please enter a login to search")
+    .transform((value) => value.trim().toLowerCase())
+    .matches(
+      /^[a-z0-9_-]{2,20}$/i,
+      "Login must be 2-20 characters and contain only letters, numbers, underscores, or hyphens"
+    ),
 });
 
 /**
  * Main component for the search screen
  * Allows users to search for 42 students by login
- * 
+ *
  * @returns {JSX.Element} The rendered component
  */
 export default function Index() {
   /**
    * Handles the search operation when a login is submitted
-   * 
+   *
    * @param {string} login - The student login to search for
    * @param {Object} params - Formik helper functions
    * @param {Function} params.setSubmitting - Function to set form submission state
    */
-  const handleSearch = async (login: string, { setSubmitting }: { setSubmitting: (isSubmitting: boolean) => void }) => {
+  const handleSearch = async (
+    login: string,
+    { setSubmitting }: { setSubmitting: (isSubmitting: boolean) => void }
+  ) => {
     try {
       await userService.searchUser(login);
       router.push({
@@ -85,21 +91,21 @@ export default function Index() {
 
   /**
    * Renders the search input field
-   * 
+   *
    * @param {Object} props - Component props
    * @param {string} props.value - Current value of the input field
    * @param {Function} props.onChange - Function to handle input change
    * @param {Function} props.onBlur - Function to handle input blur
    * @param {Function} props.onSubmit - Function to handle input submission
    */
-  const SearchInput = ({ 
-    value, 
-    onChange, 
-    onBlur, 
-    onSubmit 
-  }: { 
+  const SearchInput = ({
+    value,
+    onChange,
+    onBlur,
+    onSubmit,
+  }: {
     value: string;
-    onChange: (text: string) => void; 
+    onChange: (text: string) => void;
     onBlur: () => void;
     onSubmit: () => void;
   }) => (
@@ -124,7 +130,7 @@ export default function Index() {
 
   /**
    * Renders an error message if validation fails
-   * 
+   *
    * @param {Object} props - Component props
    * @param {string | undefined} props.error - Error message to display
    */
@@ -135,26 +141,23 @@ export default function Index() {
 
   /**
    * Renders the search button
-   * 
+   *
    * @param {Object} props - Component props
    * @param {Function} props.onPress - Function to handle button press
    * @param {boolean} props.isDisabled - Whether the button is disabled
    * @param {boolean} props.isLoading - Whether the button shows a loading indicator
    */
-  const SearchButton = ({ 
-    onPress, 
-    isDisabled, 
-    isLoading 
-  }: { 
+  const SearchButton = ({
+    onPress,
+    isDisabled,
+    isLoading,
+  }: {
     onPress: () => void;
     isDisabled: boolean;
     isLoading: boolean;
   }) => (
     <TouchableOpacity
-      style={[
-        styles.searchButton,
-        isDisabled && styles.searchButtonDisabled
-      ]}
+      style={[styles.searchButton, isDisabled && styles.searchButtonDisabled]}
       onPress={onPress}
       disabled={isDisabled}
     >
@@ -172,24 +175,32 @@ export default function Index() {
    */
   const SearchForm = () => (
     <Formik
-      initialValues={{ login: '' }}
+      initialValues={{ login: "" }}
       validationSchema={LoginSchema}
       onSubmit={(values, formikHelpers) => {
         const normalizedLogin = values.login.trim().toLowerCase();
         handleSearch(normalizedLogin, formikHelpers);
       }}
     >
-      {({ handleChange, handleSubmit, handleBlur, values, errors, touched, isSubmitting }) => (
+      {({
+        handleChange,
+        handleSubmit,
+        handleBlur,
+        values,
+        errors,
+        touched,
+        isSubmitting,
+      }) => (
         <View style={styles.searchContainer}>
           <SearchInput
             value={values.login}
-            onChange={(text) => handleChange('login')(text)}
-            onBlur={() => handleBlur('login')}
+            onChange={(text) => handleChange("login")(text)}
+            onBlur={() => handleBlur("login")}
             onSubmit={() => handleSubmit()}
           />
-          
+
           <ErrorMessage error={touched.login ? errors.login : undefined} />
-          
+
           <SearchButton
             onPress={() => handleSubmit()}
             isDisabled={isSubmitting || !values.login.trim()}
@@ -222,11 +233,11 @@ const styles = StyleSheet.create({
     padding: 10,
   },
   errorText: {
-    color: '#ff6b6b',
+    color: "#ff6b6b",
     fontSize: 14,
     marginTop: 5,
     marginBottom: 5,
-    textAlign: 'center',
+    textAlign: "center",
   },
   logo: {
     width: 150,
