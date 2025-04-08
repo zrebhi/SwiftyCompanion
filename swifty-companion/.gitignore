@@ -36,6 +36,6 @@ yarn-error.*
 *.tsbuildinfo
 
 #tests
-/app/tests/
+tests/
 
 app-example
