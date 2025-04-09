@@ -1,7 +1,7 @@
 import axios from "axios";
-import authService from "./authService";
+import Constants from "expo-constants";
+import ENV from "../utils/EnvValidation";
 
-// Interfaces for user data
 export interface UserBasic {
   id: number;
   login: string;
@@ -39,16 +39,11 @@ export interface UserDetail extends UserBasic {
 }
 
 class UserService {
-  // Search for a user by login
   async searchUser(login: string): Promise<UserDetail> {
     try {
-      const token = await authService.getValidToken();
-      const response = await axios.get(
-        `https://api.intra.42.fr/v2/users/${login}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      const URL = `${ENV.API_BASE_URL}/api/users/${login}`;
+      console.log("Sending request to:", URL);
+      const response = await axios.get(URL);
       return response.data;
     } catch (error) {
       if (axios.isAxiosError(error) && error.response?.status === 404) {

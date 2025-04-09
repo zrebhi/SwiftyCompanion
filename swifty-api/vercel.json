@@ -1,0 +1,14 @@
+{
+    "version": 2,
+    "buildCommand": null,
+    "outputDirectory": null,
+    "functions": {
+      "api/users/[login].js": {
+        "memory": 1024,
+        "maxDuration": 10
+      }
+    },
+    "routes": [
+      { "src": "/api/users/(.*)", "dest": "/api/users/[login].js?login=$1" }
+    ]
+  }

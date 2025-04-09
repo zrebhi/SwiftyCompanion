@@ -18,5 +18,7 @@ export const getMainCursus = (cursusUsers: any[]) => {
     // If no main cursus is found, return the one with the highest level
     return mainCursus || cursusUsers.sort((a, b) => b.level - a.level)[0];
   };
+
+  export default getMainCursus;
   
   // You can add other profile-related utility functions here in the future

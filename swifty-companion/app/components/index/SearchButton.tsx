@@ -1,0 +1,53 @@
+import React from "react";
+import { Text, StyleSheet, ActivityIndicator } from "react-native";
+import { TouchableOpacity } from "react-native-gesture-handler";
+
+/**
+ * Renders the search button
+ *
+ * @param props - Component props
+ */
+export const SearchButton = ({
+  onPress,
+  isDisabled,
+  isLoading,
+}: {
+  onPress: () => void;
+  isDisabled: boolean;
+  isLoading: boolean;
+}) => (
+  <TouchableOpacity
+    style={[styles.searchButton, isDisabled && styles.searchButtonDisabled]}
+    onPress={onPress}
+    disabled={isDisabled}
+  >
+    {isLoading ? (
+      <ActivityIndicator color="white" />
+    ) : (
+      <Text style={styles.searchButtonText}>Search</Text>
+    )}
+  </TouchableOpacity>
+);
+
+const styles = StyleSheet.create({
+  searchButton: {
+    borderColor: "white",
+    borderWidth: 1,
+    borderRadius: 25,
+    height: 50,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 20,
+    width: "100%",
+  },
+  searchButtonDisabled: {
+    opacity: 0.6,
+  },
+  searchButtonText: {
+    color: "white",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+});
+
+export default SearchButton;

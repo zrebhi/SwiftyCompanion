@@ -127,3 +127,5 @@ const paginationStyles = StyleSheet.create({
     marginHorizontal: 15,
   },
 });
+
+export default PaginationControls;

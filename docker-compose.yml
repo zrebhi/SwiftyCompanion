@@ -2,11 +2,24 @@ services:
   app:
     build:
       context: .
-      dockerfile: Dockerfile
+      dockerfile: ./swifty-companion/Dockerfile
     container_name: swifty-companion
     volumes:
       - ./swifty-companion:/swifty-companion
     network_mode: host
     stdin_open: true
     tty: true
-    command: bash
+    env_file: .env
+  
+  api:
+    build:
+      context: .
+      dockerfile: ./swifty-api/Dockerfile
+    container_name: swifty-api
+    volumes:
+      - ./swifty-api:/swifty-api
+    network_mode: host
+    stdin_open: true
+    tty: true
+    env_file: .env
+    command: bash -c "vercel dev --listen 3000"

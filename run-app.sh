@@ -1,30 +1,88 @@
 #!/bin/bash
+# filepath: /home/zak/Projects/SwiftyCompanion/run-app.sh
 
-set -e  # Exit on error
+# Load environment variables
+set -a
+source .env
+set +a
 
-# Colors for terminal output
-GREEN='\033[0;32m'
-BLUE='\033[0;34m'
+# Define colors for better readability
 RED='\033[0;31m'
-YELLOW='\033[1;33m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+BLUE='\033[0;36m'
 NC='\033[0m' # No Color
 
-echo -e "${BLUE}==== Swifty Companion Development Environment ====${NC}"
+echo -e "${BLUE}Loading configuration from .env file...${NC}"
 
+# Convert to lowercase for comparison
+PROJECT_LOCAL_API=$(echo "$PROJECT_LOCAL_API" | tr '[:upper:]' '[:lower:]')
+
+# Stop any running containers
 echo -e "${YELLOW}Stopping any running containers...${NC}"
-docker-compose down || { echo -e "${RED}Failed to stop containers${NC}"; exit 1; }
+docker-compose down
 
-echo -e "${YELLOW}Building and starting containers...${NC}"
-docker-compose up -d --build || { echo -e "${RED}Failed to build and start containers${NC}"; exit 1; }
+# Build and start app container
+echo -e "${YELLOW}Building and starting app container...${NC}"
+docker-compose up -d --build app
 
-echo -e "${GREEN}Container is running!${NC}"
-echo -e "${BLUE}Starting Expo...${NC}"
-echo -e "${YELLOW}(This might take a moment to start)${NC}"
+# Function to detect the terminal emulator
+launch_terminal() {
+  local title="$1"
+  local command="$2"
+  
+  # Try gnome-terminal (GNOME)
+  if command -v gnome-terminal >/dev/null; then
+    gnome-terminal --title="$title" -- bash -c "$command; exec bash" &
+    return 0
+  fi
+  
+  # Try konsole (KDE)
+  if command -v konsole >/dev/null; then
+    konsole --new-tab --title "$title" -e bash -c "$command; exec bash" &
+    return 0
+  fi
+  
+  # Try xterm (fallback for X11)
+  if command -v xterm >/dev/null; then
+    xterm -T "$title" -e bash -c "$command; exec bash" &
+    return 0
+  fi
+  
+  echo -e "${RED}No compatible terminal emulator found!${NC}"
+  return 1
+}
 
-# Execute the Expo command in the container
-docker exec -it swifty-companion bash -c "npx expo start"
+# Conditionally start API container
+if [ "$PROJECT_LOCAL_API" = "true" ]; then
+  echo -e "${YELLOW}Starting local API service...${NC}"
+  docker-compose up -d --build api
+  
+  # Launch terminal for API
+  if launch_terminal "Swifty API - Vercel" "docker exec -it swifty-api bash -c 'cd /swifty-api && vercel dev --listen 3000'"; then
+    echo -e "${GREEN}Launched Vercel API terminal!${NC}"
+  else
+    echo -e "${RED}Failed to launch API terminal!${NC}"
+  fi
+else
+  echo -e "${BLUE}Using remote API at ${YELLOW}$PROJECT_API_URL${BLUE}. API container not started.${NC}"
+fi
 
-# Handle exit gracefully
-echo -e "${BLUE}Expo server stopped.${NC}"
-echo -e "${YELLOW}Container is still running in the background.${NC}"
-echo -e "${YELLOW}To stop it, run: docker-compose down${NC}"
+# Launch terminal for app (always)
+echo -e "${GREEN}Launching Expo development server...${NC}"
+docker exec -it swifty-companion bash -c 'cd /swifty-companion && npx expo start --offline';
+echo -e "${YELLOW}Expo server exited.${NC}"
+
+# Prompt user to stop all containers
+echo -e "${BLUE}Containers are still running. Do you want to stop them? (y/n)${NC}"
+read -n 1 -r
+echo
+if [[ $REPLY =~ ^[Yy]$ ]]; then
+  echo -e "${YELLOW}Stopping all containers...${NC}"
+  docker-compose down
+  echo -e "${GREEN}All containers stopped successfully.${NC}"
+else
+  echo -e "${BLUE}Containers are still running. You can stop them later with 'docker-compose down'.${NC}"
+fi
+
+echo -e "${GREEN}Thank you for using Swifty Companion!${NC}"

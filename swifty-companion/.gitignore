@@ -38,4 +38,8 @@ yarn-error.*
 #tests
 tests/
 
+# obsolete
+./app/services/authService.ts
+
 app-example
+.vercel
