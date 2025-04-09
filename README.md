@@ -26,7 +26,12 @@ You can run SwiftyCompanion directly on your device using the Expo Go app:
 2. Open your phone's camera app and scan the QR code below
 3. Select "Open with Expo Go" when prompted
 
+<details>
+<summary>📱 Click to show QR code</summary>
+
 ![SwiftyCompanion QR Code](https://qr.expo.dev/eas-update?slug=exp&projectId=6b82f6c9-afb7-467f-ade4-ede7ace16ecf&groupId=d1c01c52-43dc-4cb9-a09c-f9fd57073a66&host=u.expo.dev)
+
+</details>
 
 ## Setup
 
