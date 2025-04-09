@@ -12,6 +12,22 @@ This project has been successfully completed and includes:
 - Responsive design that works on both iOS and Android
 - Production-ready deployment with Vercel and EAS
 
+## Running the App on Your Phone
+
+You can run SwiftyCompanion directly on your device using the Expo Go app:
+
+### For Android Users:
+1. Install [Expo Go](https://play.google.com/store/apps/details?id=host.exp.exponent) from the Google Play Store
+2. Open the Expo Go app
+3. Tap on "Scan QR Code" in the app and scan the QR code below
+
+### For iOS Users:
+1. Install [Expo Go](https://apps.apple.com/app/expo-go/id982107779) from the App Store
+2. Open your phone's camera app and scan the QR code below
+3. Select "Open with Expo Go" when prompted
+
+![SwiftyCompanion QR Code](https://qr.expo.dev/eas-update?slug=exp&projectId=6b82f6c9-afb7-467f-ade4-ede7ace16ecf&groupId=d1c01c52-43dc-4cb9-a09c-f9fd57073a66&host=u.expo.dev)
+
 ## Setup
 
 ### Prerequisites
