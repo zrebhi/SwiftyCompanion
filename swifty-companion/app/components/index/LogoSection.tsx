@@ -3,7 +3,10 @@ import { View, Text, Image, StyleSheet } from "react-native";
 import colors from "@/constants/colors";
 
 /**
- * Renders the app logo and title section
+ * Displays the application's logo (42 logo) and title ("Swifty Companions").
+ * This is typically shown on the main search screen.
+ *
+ * @returns {JSX.Element} The rendered logo and title section.
  */
 export const LogoSection = () => (
   <View style={styles.logoContainer}>

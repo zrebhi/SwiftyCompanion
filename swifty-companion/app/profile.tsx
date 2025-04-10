@@ -6,6 +6,12 @@
  * - Level progress
  * - Skills
  * - Projects
+ *
+ * This component serves as the main container for the profile page, handling data fetching
+ * via the useUserData hook and coordinating the display of all profile sections.
+ *
+ * @module Profile
+ * @return {JSX.Element} The rendered profile screen component
  */
 import {
   View,
@@ -38,54 +44,54 @@ export default function Profile() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
-        <StatusBar
-          barStyle="light-content"
-          backgroundColor="#121212"
-          translucent={false}
-        />
+      <StatusBar
+        barStyle="light-content"
+        backgroundColor={colors.background.darker}
+        translucent={false}
+      />
 
-        {loading ? (
-          <LoadingDisplay message="Loading user data..." />
-        ) : error ? (
-          <ErrorDisplay message={error} onBack={() => router.back()} />
-        ) : userData ? (
-          <ScrollView style={styles.scrollContainer}>
-            <ProfileHeader
-              userData={userData}
-              onBackPress={() => router.back()}
-            />
+      {loading ? (
+        <LoadingDisplay message="Loading user data..." />
+      ) : error ? (
+        <ErrorDisplay message={error} onBack={() => router.back()} />
+      ) : userData ? (
+        <ScrollView style={styles.scrollContainer}>
+        <View style={styles.sectionContainer}>
+          <ProfileHeader
+            userData={userData}
+            onBackPress={() => router.back()}
+          />
+        </View>
 
-            <View>
-              {userData.cursus_users && userData.cursus_users.length > 0 && (
-                <LevelProgress
-                  level={getMainCursus(userData.cursus_users)?.level || 0}
-                />
-              )}
-              <StatsSection
-                wallet={userData.wallet}
-                correctionPoints={userData.correction_point}
+          <View style={styles.sectionContainer}>
+            {userData.cursus_users && userData.cursus_users.length > 0 && (
+              <LevelProgress
+                level={getMainCursus(userData.cursus_users)?.level || 0}
               />
-            </View>
-
+            )}
+            <StatsSection
+              wallet={userData.wallet}
+              correctionPoints={userData.correction_point}
+            />
+          </View>
+          <View style={styles.sectionContainer}>
             {userData.cursus_users?.length > 0 &&
               userData.cursus_users[0].skills && (
                 <SkillsList
                   skills={getMainCursus(userData.cursus_users)?.skills || []}
                 />
               )}
+          </View>
 
-            <View style={styles.sectionContainer}>
-              <Text style={styles.sectionTitle}>Projects</Text>
-              {userData.projects_users?.length > 0 && (
-                <ProjectsList projects={userData.projects_users} />
-              )}
-            </View>
-          </ScrollView>
-        ) : (
-          <Text style={styles.noDataText}>No user data available</Text>
-        )}
-      </View>
+          <View style={styles.sectionContainer}>
+            {userData.projects_users?.length > 0 && (
+              <ProjectsList projects={userData.projects_users} />
+            )}
+          </View>
+        </ScrollView>
+      ) : (
+        <Text style={styles.noDataText}>No user data available</Text>
+      )}
     </SafeAreaView>
   );
 }
@@ -95,26 +101,21 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background.darker,
   },
-  container: {
-    flex: 1,
-    backgroundColor: "#121212",
-    paddingTop: StatusBar.currentHeight || 0,
-  },
   scrollContainer: {
     flex: 1,
   },
   noDataText: {
-    color: "#fff",
+    color: colors.text.primary,
     textAlign: "center",
     margin: 20,
   },
   sectionContainer: {
-    backgroundColor: "#1E1E1E",
-    padding: 15,
+    backgroundColor: colors.background.lighter,
+    padding: 0,
     marginVertical: 10,
   },
   sectionTitle: {
-    color: "#fff",
+    color: colors.text.primary,
     fontSize: 18,
     fontWeight: "bold",
   },

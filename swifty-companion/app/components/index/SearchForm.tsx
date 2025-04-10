@@ -11,7 +11,8 @@ import SearchButton from "./SearchButton";
 import userService from "../../services/userService";
 
 /**
- * Validation schema for the login search field
+ * Validation schema for the login search field.
+ * Ensures the login is required, trimmed, and matches the allowed format.
  */
 const LoginSchema = Yup.object().shape({
   login: Yup.string()
@@ -24,7 +25,12 @@ const LoginSchema = Yup.object().shape({
 });
 
 /**
- * Handles the search operation when a login is submitted
+ * Handles the search operation when a login is submitted.
+ * Navigates to the profile page if the search is successful.
+ *
+ * @param {string} login - The login to search for.
+ * @param {object} helpers - Formik helpers for managing form state.
+ * @param {function} helpers.setSubmitting - Function to toggle the submitting state.
  */
 const handleSearch = async (
   login: string,

@@ -3,9 +3,14 @@ import { Text, StyleSheet, ActivityIndicator } from "react-native";
 import { TouchableOpacity } from "react-native-gesture-handler";
 
 /**
- * Renders the search button
+ * A button component for initiating a search action.
+ * Displays a loading spinner when `isLoading` is true and disables the button when `isDisabled` is true.
  *
- * @param props - Component props
+ * @param {object} props - Component props.
+ * @param {() => void} props.onPress - Callback function triggered when the button is pressed.
+ * @param {boolean} props.isDisabled - Whether the button is disabled.
+ * @param {boolean} props.isLoading - Whether the button is in a loading state.
+ * @returns {JSX.Element} The rendered search button component.
  */
 export const SearchButton = ({
   onPress,
