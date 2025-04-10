@@ -3,9 +3,15 @@ import { View, TextInput, StyleSheet } from "react-native";
 import { FontAwesome } from "@expo/vector-icons";
 
 /**
- * Renders the search input field
+ * A styled input field for entering a 42 login to search.
+ * Includes a search icon and handles input changes, blur events, and submission.
  *
- * @param props - Component props
+ * @param {object} props - Component props.
+ * @param {string} props.value - The current value of the input field.
+ * @param {(text: string) => void} props.onChange - Callback for handling text changes.
+ * @param {() => void} props.onBlur - Callback for handling blur events.
+ * @param {() => void} props.onSubmit - Callback for handling submission events.
+ * @returns {JSX.Element} The rendered search input component.
  */
 export const SearchInput = ({
   value,

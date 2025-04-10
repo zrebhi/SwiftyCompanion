@@ -1,17 +1,45 @@
 import { View, Text, StyleSheet } from "react-native";
 import usePagination from "../../hooks/usePagination";
 import { PaginationControls } from "../common/PaginationControls";
+import colors from "@/constants/colors";
 
+/**
+ * Represents a user skill from the 42 API
+ *
+ * @interface Skill
+ * @property {number} id - The unique identifier of the skill
+ * @property {string} name - The name of the skill (e.g., "Unix", "Algorithms & AI", etc.)
+ * @property {number} level - The user's proficiency level in the skill (0-21)
+ */
 interface Skill {
   id: number;
   name: string;
   level: number;
 }
 
+/**
+ * Props for the SkillsList component
+ *
+ * @interface SkillsListProps
+ * @property {Skill[]} skills - Array of skills to display
+ */
 interface SkillsListProps {
   skills: Skill[];
 }
 
+/**
+ * SkillsList Component
+ *
+ * Displays a user's skills with visual progress bars and pagination controls.
+ * Skills are sorted by level (highest first) and displayed with:
+ * - Skill name
+ * - Numeric level value
+ * - Visual progress bar representing level
+ *
+ * @param {SkillsListProps} props - The component props
+ * @param {Skill[]} props.skills - Array of skills to display
+ * @returns {JSX.Element} The rendered skills list component
+ */
 export const SkillsList = ({ skills }: SkillsListProps) => {
   const sortedSkills = [...skills].sort((a, b) => b.level - a.level);
 
@@ -26,7 +54,7 @@ export const SkillsList = ({ skills }: SkillsListProps) => {
   } = usePagination(sortedSkills, 5);
 
   return (
-    <View style={styles.sectionContainer}>
+    <View style={styles.skillsListContainer}>
       <Text style={styles.sectionTitle}>Skills</Text>
       <View style={styles.skillsContainer}>
         {currentSkills.map((skill) => (
@@ -61,15 +89,14 @@ export const SkillsList = ({ skills }: SkillsListProps) => {
 };
 
 const styles = StyleSheet.create({
-  sectionContainer: {
-    backgroundColor: "#1E1E1E",
-    padding: 15,
-    marginVertical: 10,
+  skillsListContainer: {
+    padding: 20,
   },
   sectionTitle: {
-    color: "#fff",
+    color: colors.text.primary,
     fontSize: 18,
     fontWeight: "bold",
+    marginBottom: 10,
   },
   skillsContainer: {
     marginTop: 10,
@@ -78,12 +105,12 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   skillName: {
-    color: "#ddd",
+    color: colors.text.secondary,
     fontSize: 14,
   },
   skillLevelContainer: {
     height: 8,
-    backgroundColor: "#333",
+    backgroundColor: colors.progress.background,
     borderRadius: 4,
     overflow: "hidden",
     position: "relative",
@@ -91,11 +118,11 @@ const styles = StyleSheet.create({
   skillLevelBar: {
     position: "absolute",
     height: "100%",
-    backgroundColor: "#4CAF50",
+    backgroundColor: colors.progress.skill,
     borderRadius: 4,
   },
   skillLevelText: {
-    color: "#ddd",
+    color: colors.text.secondary,
     fontSize: 12,
   },
   skillLevelLine: {

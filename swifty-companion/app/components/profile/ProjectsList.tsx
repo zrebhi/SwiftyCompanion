@@ -3,15 +3,23 @@
  *
  * Renders a user's projects grouped by their status (in progress, completed, failed)
  * with pagination controls for each section.
+ *
+ * @module ProjectsList
  */
 import { View, Text, StyleSheet } from "react-native";
 
 import usePagination from "../../hooks/usePagination";
 import { PaginationControls } from "../common/PaginationControls";
 import { ProjectUser } from "../../services/userService";
+import colors from "@/constants/colors";
 
 /**
  * Props for individual project category sections
+ *
+ * @interface ProjectCategoryProps
+ * @property {string} title - The title of the category section (e.g., "In Progress", "Completed", "Failed")
+ * @property {ProjectUser[]} projects - Array of projects belonging to this category
+ * @property {(project: ProjectUser) => JSX.Element} renderProject - Function to render an individual project
  */
 interface ProjectCategoryProps {
   title: string;
@@ -21,6 +29,9 @@ interface ProjectCategoryProps {
 
 /**
  * Props for the main ProjectsList component
+ *
+ * @interface ProjectsListProps
+ * @property {ProjectUser[]} projects - Array of all projects to display
  */
 interface ProjectsListProps {
   projects: ProjectUser[];
@@ -28,6 +39,12 @@ interface ProjectsListProps {
 
 /**
  * Renders a category of projects with pagination
+ *
+ * @param {ProjectCategoryProps} props - The component props
+ * @param {string} props.title - The category title
+ * @param {ProjectUser[]} props.projects - The projects in this category
+ * @param {(project: ProjectUser) => JSX.Element} props.renderProject - Render function for projects
+ * @returns {JSX.Element | null} The rendered category section or null if empty
  */
 const ProjectCategory = ({
   title,
@@ -64,20 +81,29 @@ const ProjectCategory = ({
 
 /**
  * Main component that groups and displays user projects by status
+ *
+ * Projects are categorized into three groups:
+ * - Completed: finished and validated projects
+ * - Failed: finished but not validated projects
+ * - In Progress: projects that are not yet finished
+ *
+ * @param {ProjectsListProps} props - The component props
+ * @param {ProjectUser[]} props.projects - Array of all projects to display
+ * @returns {JSX.Element} The rendered projects list component
  */
 export const ProjectsList = ({ projects }: ProjectsListProps) => {
   const completedProjects = projects.filter(
-    (p) => p.status === "finished" && p["validated?"] === true
+    (p) => p["validated?"] === true
   );
   const failedProjects = projects.filter(
-    (p) => p.status === "finished" && p["validated?"] === false
+    (p) => p["validated?"] === false
   );
-  const inProgressProjects = projects.filter((p) => p.status !== "finished");
+  const inProgressProjects = projects.filter((p) => p["validated?"] === null);
 
   const renderProject = (project: ProjectUser) => {
     const isValidated = project["validated?"] === true;
-    const isFailed = project.status === "finished" && !isValidated;
-    const isInProgress = project.status !== "finished";
+    const isFailed = project["validated?"] === false;
+    const isInProgress = project["validated?"] === null;
 
     return (
       <View
@@ -97,12 +123,8 @@ export const ProjectsList = ({ projects }: ProjectsListProps) => {
               isInProgress ? styles.projectStatus : null,
             ]}
           >
-            {(project.status === "finished" &&
-              ((isValidated && "Finished") || "Failed")) ||
-              "In progress"}
-            {project.final_mark !== null &&
-              project.status === "finished" &&
-              ` (${project.final_mark})`}
+            {isValidated ? "Finished" : isFailed ? "Failed" : "In progress"}
+            {project.final_mark !== null && ` (${project.final_mark})`}
           </Text>
         </View>
       </View>
@@ -110,7 +132,8 @@ export const ProjectsList = ({ projects }: ProjectsListProps) => {
   };
 
   return (
-    <View>
+    <View style={styles.projectsListContainer}>
+      <Text style={styles.projectsListTitle}>Projects</Text>
       <ProjectCategory
         title="In Progress"
         projects={inProgressProjects}
@@ -133,24 +156,33 @@ export const ProjectsList = ({ projects }: ProjectsListProps) => {
 };
 
 const styles = StyleSheet.create({
-  projectSection: {
+  projectsListContainer: {
+    padding: 20,
+  },
+  projectsListTitle: {
+    color: colors.text.primary,
+    fontSize: 18,
+    fontWeight: "bold",
     marginBottom: 10,
   },
+  projectSection: {
+    padding: 0,
+    marginVertical: 10,
+  },
   projectSectionTitle: {
-    color: "#64B5F6",
+    color: colors.accent.secondary,
     fontSize: 16,
-    marginTop: 15,
     marginBottom: 5,
   },
   projectItem: {
-    backgroundColor: "#2c2c2c",
+    backgroundColor: colors.background.item,
     borderRadius: 8,
     padding: 12,
     marginVertical: 8,
-    borderLeftColor: "#64B5F6",
+    borderLeftColor: colors.accent.secondary,
   },
   projectName: {
-    color: "#fff",
+    color: colors.text.primary,
     fontSize: 16,
     fontWeight: "500",
   },
@@ -160,22 +192,22 @@ const styles = StyleSheet.create({
     marginTop: 5,
   },
   projectStatus: {
-    color: "#bbb",
+    color: colors.text.secondary,
     fontSize: 14,
   },
   validatedProject: {
-    borderLeftColor: "#00e676",
+    borderLeftColor: colors.ui.border.success,
     borderLeftWidth: 4,
   },
   failedProject: {
-    borderLeftColor: "red",
+    borderLeftColor: colors.ui.border.error,
     borderLeftWidth: 4,
   },
   validatedText: {
-    color: "#00e676",
+    color: colors.accent.success,
   },
   failedText: {
-    color: "darkred",
+    color: colors.accent.error,
   },
 });
 

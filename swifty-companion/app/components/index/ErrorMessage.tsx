@@ -2,9 +2,12 @@ import React from "react";
 import { Text, StyleSheet } from "react-native";
 
 /**
- * Renders an error message if validation fails
+ * Displays a styled error message text.
+ * Renders nothing if the error prop is null or undefined.
  *
- * @param props - Component props
+ * @param {object} props - Component props.
+ * @param {string | undefined} props.error - The error message string to display. If undefined or null, the component returns null.
+ * @returns {JSX.Element | null} The rendered error message text component or null.
  */
 export const ErrorMessage = ({ error }: { error: string | undefined }) => {
   if (!error) return null;

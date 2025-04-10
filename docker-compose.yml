@@ -6,11 +6,15 @@ services:
     container_name: swifty-companion
     volumes:
       - ./swifty-companion:/swifty-companion
+      - ${ANDROID_SDK_PATH}:/host-android-sdk
     network_mode: host
     stdin_open: true
     tty: true
     env_file: .env
-  
+    environment:
+      - ANDROID_HOME=/host-android-sdk
+      - ADB_SERVER_SOCKET=tcp:0.0.0.0:5037
+
   api:
     build:
       context: .

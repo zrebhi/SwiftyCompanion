@@ -1,12 +1,28 @@
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { FontAwesome } from "@expo/vector-icons";
 
+/**
+ * Props for the ErrorDisplay component.
+ * @interface ErrorDisplayProps
+ * @property {string} message - The error message to display.
+ * @property {() => void} [onRetry] - Optional callback function to execute when the retry button is pressed.
+ * @property {() => void} onBack - Callback function to execute when the back button is pressed.
+ */
 interface ErrorDisplayProps {
   message: string;
   onRetry?: () => void;
   onBack: () => void;
 }
 
+/**
+ * A component to display an error message with optional retry and back buttons.
+ *
+ * @param {ErrorDisplayProps} props - The props for the component.
+ * @param {string} props.message - The error message text.
+ * @param {() => void} [props.onRetry] - Optional handler for the retry action.
+ * @param {() => void} props.onBack - Handler for the back action.
+ * @returns {JSX.Element} The rendered error display component.
+ */
 export const ErrorDisplay = ({ message, onRetry, onBack }: ErrorDisplayProps) => {
   return (
     <View style={styles.errorContainer}>

@@ -1,0 +1,21 @@
+{
+  "mcpServers": {
+    "github.com/elevenlabs/elevenlabs-mcp": {
+      "command": "/home/zak/Documents/Cline/MCP/elevenlabs-mcp/.venv/bin/python3.11",
+      "args": ["-m", "elevenlabs_mcp"],
+      "env": {
+        "ELEVENLABS_API_KEY": "<insert-your-api-key-here>"
+      }
+    },
+    "github.com/modelcontextprotocol/servers/tree/main/src/brave-search": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-brave-search"
+      ],
+      "env": {
+        "BRAVE_API_KEY": "<insert-your-api-key-here>"
+      }
+    }
+  }
+}

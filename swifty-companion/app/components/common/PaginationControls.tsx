@@ -3,6 +3,16 @@ import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { FontAwesome } from "@expo/vector-icons";
 
+/**
+ * Props for the PaginationControls component.
+ * @interface PaginationControlsProps
+ * @property {number} currentPage - The currently active page number.
+ * @property {number} totalPages - The total number of pages available.
+ * @property {() => void} goToFirstPage - Callback function to navigate to the first page.
+ * @property {() => void} goToLastPage - Callback function to navigate to the last page.
+ * @property {() => void} goToNextPage - Callback function to navigate to the next page.
+ * @property {() => void} goToPreviousPage - Callback function to navigate to the previous page.
+ */
 interface PaginationControlsProps {
   currentPage: number;
   totalPages: number;
@@ -12,6 +22,15 @@ interface PaginationControlsProps {
   goToPreviousPage: () => void;
 }
 
+/**
+ * A component providing pagination controls (First, Previous, Next, Last).
+ * Includes page number display (e.g., "1/5").
+ * Controls are disabled appropriately based on the current page and total pages.
+ * Does not render if totalPages is 1 or less.
+ *
+ * @param {PaginationControlsProps} props - The props for the component.
+ * @returns {JSX.Element | null} The rendered pagination controls or null.
+ */
 export const PaginationControls = ({
   currentPage,
   totalPages,
