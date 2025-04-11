@@ -32,3 +32,6 @@ SearchSuggestions_RoadMap.md
 swifty-companion/app/utils/debounce.ts
 .config/
 ProjectTest/
+swifty-api/tests/
+output.md
+.llm-context
