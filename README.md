@@ -18,11 +18,9 @@ This project has been successfully completed and includes:
 <details>
 <summary>▶️ Click to view demo video</summary>
 
-https://github.com/zrebhi/SwiftyCompanion/assets/demo.webm
+https://github.com/zrebhi/SwiftyCompanion/demo.mp4
 
 </details>
-
-_Note: If the video doesn't play directly in GitHub, you can download it and play it locally, or view it in the repo's assets folder._
 
 ## Running the App on Your Phone
 
