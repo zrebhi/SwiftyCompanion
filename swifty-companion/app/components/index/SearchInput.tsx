@@ -63,7 +63,7 @@ export const SearchInput = ({
   // 2. Either there are suggestions OR we're loading suggestions
   // const showSuggestions = isFocused && (suggestions.length > 0 || isLoading);
   const showSuggestions =
-    isFocused && (suggestions.length > 0 || isLoading || value.length > 0);
+    isFocused && (suggestions.length > 0 && value.length > 0 || isLoading);
 
   return (
     <View style={styles.container}>

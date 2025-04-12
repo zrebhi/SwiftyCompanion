@@ -16,11 +16,10 @@ import userService from "../../services/userService";
  */
 const LoginSchema = Yup.object().shape({
   login: Yup.string()
-    .required("Please enter a login to search")
     .transform((value) => value.trim().toLowerCase())
     .matches(
-      /^[a-z0-9_-]{2,20}$/i,
-      "Login must be 2-20 characters and contain only letters, numbers, underscores, or hyphens"
+      /^[a-z0-9_-]{1,20}$/i,
+      "Login must be 1-20 characters and contain only letters, numbers, underscores, or hyphens"
     ),
 });
 
