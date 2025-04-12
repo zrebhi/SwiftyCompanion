@@ -29,4 +29,6 @@ yarn-error.log*
 notes.txt
 api-data-zrebhi-2025-04-08T03-06-26-602Z.json
 SearchSuggestions_RoadMap.md
-swifty-companion/app/utils/debounce.ts
+CLAUDE.md
+context.md
+swifty-api/tests

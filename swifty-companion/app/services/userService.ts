@@ -80,10 +80,38 @@ export interface UserDetail extends UserBasic {
 }
 
 /**
+ * Represents a user suggestion result from the 42 API
+ *
+ * @interface UserSuggestion
+ * @property {number} id - User's unique identifier
+ * @property {string} login - User's login name (username)
+ * @property {string} displayname - User's display name
+ * @property {object} image - User's profile image information
+ * @property {string} image.versions.small - URL to the user's small profile image
+ */
+export interface UserSuggestion {
+  id: number;
+  login: string;
+  displayname: string;
+  image: {
+    versions: {
+      small: string;
+    };
+  };
+}
+
+/**
  * Service for interacting with user-related API endpoints
  * Provides methods to search and retrieve user data from the 42 API
  */
 class UserService {
+  // Cache for storing suggestion results
+  private suggestionCache: {
+    [query: string]: { data: UserSuggestion[]; timestamp: number };
+  } = {};
+  private readonly CACHE_TTL = 120000; // 2 minutes in milliseconds
+  private readonly MAX_CACHE_SIZE = 50; // To limit memory usage
+
   /**
    * Searches for a user by login name
    *
@@ -105,6 +133,77 @@ class UserService {
       }
       console.error("Error searching user:", error);
       throw new Error("Failed to search user. Please try again.");
+    }
+  }
+
+  /**
+   * Gets search suggestions as the user types a login name
+   *
+   * This method is optimized for quick, partial search requests and respects API rate limits.
+   * It uses caching to reduce API calls and only searches for queries with at least 2 characters.
+   *
+   * @param {string} query - The partial login name to search for
+   * @param {number} [limit=5] - The maximum number of suggestions to return
+   * @returns {Promise<UserSuggestion[]>} Promise resolving to an array of user suggestions
+   */
+  async getSearchSuggestions(
+    query: string,
+    limit: number = 5
+  ): Promise<UserSuggestion[]> {
+    // Only search if we have at least 1 character to avoid excessive API calls
+    if (!query || query.length < 1) {
+      return [];
+    }
+
+    const normalizedQuery = query.trim().toLowerCase();
+
+    // Check cache first
+    if (
+      this.suggestionCache[normalizedQuery] &&
+      Date.now() - this.suggestionCache[normalizedQuery].timestamp <
+        this.CACHE_TTL
+    ) {
+      return this.suggestionCache[normalizedQuery].data;
+    }
+
+    try {
+      // const URL = `${ENV.API_BASE_URL}/api/users/search?q=${encodeURIComponent(
+      //   normalizedQuery
+      // )}&sort=login&limit=${limit}`;
+      const URL = `${ENV.API_BASE_URL}/api/users/search?q=${encodeURIComponent(
+        normalizedQuery
+      )}`;
+
+      console.log("Fetching suggestions from API:", URL);
+      const response = await axios.get(URL);
+      const suggestions = response.data || [];
+
+      // Cache the results
+      this.suggestionCache[normalizedQuery] = {
+        data: suggestions,
+        timestamp: Date.now(),
+      };
+      // If the cache is full, clear outdated entries
+      if (Object.keys(this.suggestionCache).length >= this.MAX_CACHE_SIZE)
+        this.clearOutdatedCache();
+
+      return suggestions;
+    } catch (error) {
+      console.error("Error getting search suggestions:", error);
+      return []; // Return empty array on error to avoid breaking the UI
+    }
+  }
+
+  clearOutdatedCache() {
+    for (const key in this.suggestionCache) {
+      if (Date.now() - this.suggestionCache[key].timestamp > this.CACHE_TTL) {
+        delete this.suggestionCache[key];
+      }
+    }
+    // If the cache is still too large, remove the oldest entries
+    while (Object.keys(this.suggestionCache).length >= this.MAX_CACHE_SIZE) {
+      const keyToRemove = Object.keys(this.suggestionCache)[0]; // This is necessary because Object.keys() returns a temporary array, not a reference
+      delete this.suggestionCache[keyToRemove];
     }
   }
 }

@@ -18,6 +18,10 @@ echo -e "${BLUE}Loading configuration from .env file...${NC}"
 # Convert to lowercase for comparison
 PROJECT_LOCAL_API=$(echo "$PROJECT_LOCAL_API" | tr '[:upper:]' '[:lower:]')
 
+# Set default port if not specified
+PROJECT_LOCAL_API_PORT=${PROJECT_LOCAL_API_PORT:-3000}
+echo -e "${BLUE}Using API port: ${YELLOW}$PROJECT_LOCAL_API_PORT${NC}"
+
 # Stop any running containers
 echo -e "${YELLOW}Stopping any running containers...${NC}"
 docker-compose down
@@ -59,7 +63,7 @@ if [ "$PROJECT_LOCAL_API" = "true" ]; then
   docker-compose up -d --build api
   
   # Launch terminal for API
-  if launch_terminal "Swifty API - Vercel" "docker exec -it swifty-api bash -c 'cd /swifty-api && vercel dev --listen 3000'"; then
+  if launch_terminal "Swifty API - Vercel" "docker exec -it swifty-api bash -c 'cd /swifty-api && vercel dev --listen ${PROJECT_LOCAL_API_PORT}'"; then
     echo -e "${GREEN}Launched Vercel API terminal!${NC}"
   else
     echo -e "${RED}Failed to launch API terminal!${NC}"

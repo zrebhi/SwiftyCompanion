@@ -83,6 +83,7 @@ class EnvironmentValidator {
     // Safe value retrieval with validation
     this.PROJECT_LOCAL_API =
       this.getString("PROJECT_LOCAL_API").toLowerCase() === "true";
+    console.log(`PROJECT_LOCAL_API: ${this.PROJECT_LOCAL_API}`);
 
     const DEFAULT_PORT = "3000";
     this.PROJECT_LOCAL_API_PORT = this.isValidPort(
@@ -103,8 +104,11 @@ class EnvironmentValidator {
 
     // Build API_BASE_URL with validated inputs
     this.API_BASE_URL = this.PROJECT_LOCAL_API
-      ? `http://${this.IP_ADDRESS}:${this.PROJECT_LOCAL_API_PORT}`
+      ? `http://${this.IP_ADDRESS || "localhost"}:${
+          this.PROJECT_LOCAL_API_PORT
+        }`
       : this.PROJECT_API_URL;
+    console.log(`API_BASE_URL configured as: ${this.API_BASE_URL}`);
   }
 }
 
