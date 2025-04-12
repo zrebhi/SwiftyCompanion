@@ -5,6 +5,7 @@ Swifty Companion is a React Native mobile application that allows users to searc
 ## ✅ Project Completed
 
 This project has been successfully completed and includes:
+
 - User search functionality to find 42 students
 - Detailed profile viewing with skills, projects, and stats
 - OAuth2 authentication with the 42 API
@@ -17,11 +18,13 @@ This project has been successfully completed and includes:
 You can run SwiftyCompanion directly on your device using the Expo Go app:
 
 ### For Android Users:
+
 1. Install [Expo Go](https://play.google.com/store/apps/details?id=host.exp.exponent) from the Google Play Store
 2. Open the Expo Go app
 3. Tap on "Scan QR Code" in the app and scan the QR code below
 
 ### For iOS Users:
+
 1. Install [Expo Go](https://apps.apple.com/app/expo-go/id982107779) from the App Store
 2. Open your phone's camera app and scan the QR code below
 3. Select "Open with Expo Go" when prompted
@@ -29,7 +32,7 @@ You can run SwiftyCompanion directly on your device using the Expo Go app:
 <details>
 <summary>📱 Click to show QR code</summary>
 
-![SwiftyCompanion QR Code](https://qr.expo.dev/eas-update?slug=exp&projectId=6b82f6c9-afb7-467f-ade4-ede7ace16ecf&groupId=d1c01c52-43dc-4cb9-a09c-f9fd57073a66&host=u.expo.dev)
+![SwiftyCompanion QR Code](https://qr.expo.dev/eas-update?slug=exp&projectId=6b82f6c9-afb7-467f-ade4-ede7ace16ecf&groupId=3808e115-e155-4b8c-b9c5-3cac6bcb2820&host=u.expo.dev)
 
 </details>
 
@@ -43,16 +46,17 @@ You can run SwiftyCompanion directly on your device using the Expo Go app:
 
 1. Clone the repository and navigate to the project directory.
 2. Create a `.env` file in the project root based on `.env.exemple`:
+
    - Run the command: `cp .env.exemple .env`.
-   
 
 3. **Configure API access:**
 
-* **Option A: Use pre-deployed API** (Recommended, no credentials needed)
+- **Option A: Use pre-deployed API** (Recommended, no credentials needed)
+
   - In your `.env` file, set `PROJECT_LOCAL_API=false`
   - This uses our hosted API proxy at `https://swifty-api.vercel.app`
 
-* **Option B: Run your own API** (Requires 42 API credentials)
+- **Option B: Run your own API** (Requires 42 API credentials)
   - In your `.env` file:
     - Set `PROJECT_LOCAL_API=true`
     - Set `IP_ADDRESS` to your local IP address
@@ -62,10 +66,10 @@ You can run SwiftyCompanion directly on your device using the Expo Go app:
 4. **Run the application:**
    - Execute the script `./run-app.sh` to start the application.
 
-
 ## Architecture
 
 The project consists of two main components:
+
 - **Mobile App**: React Native/Expo application for the frontend
 - **API Proxy**: A Node.js serverless function that securely handles 42 API authentication
   - When `PROJECT_LOCAL_API=false`: Uses our pre-deployed proxy on Vercel
