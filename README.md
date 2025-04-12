@@ -16,7 +16,7 @@ This project has been successfully completed and includes:
 ## Demo
 
 
-<center><video src="https://github.com/user-attachments/assets/586b34ae-2b2f-4452-9589-239d600e72f4"></video></center>
+<video src="https://github.com/user-attachments/assets/586b34ae-2b2f-4452-9589-239d600e72f4"></video>
 
 
 ## 📱 Running the App on Your Phone
