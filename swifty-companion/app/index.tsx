@@ -25,17 +25,15 @@ import { ScrollView } from "react-native-gesture-handler";
 export default function Index() {
   return (
     <SafeAreaView style={styles.safeArea}>
-      <ScrollView>
-        <View style={styles.container}>
-          <StatusBar
-            barStyle="light-content"
-            backgroundColor="#121212"
-            translucent={false}
-          />
-          <LogoSection />
-          <SearchForm />
-        </View>
-      </ScrollView>
+      <View style={styles.container}>
+        <StatusBar
+          barStyle="light-content"
+          backgroundColor="#121212"
+          translucent={false}
+        />
+        <LogoSection />
+        <SearchForm />
+      </View>
     </SafeAreaView>
   );
 }
