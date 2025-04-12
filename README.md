@@ -42,7 +42,7 @@ You can run SwiftyCompanion directly on your device using the Expo Go app:
 
 </details>
 
-## Setup
+## Running the App Locally
 
 ### Prerequisites
 
