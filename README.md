@@ -13,16 +13,13 @@ This project has been successfully completed and includes:
 - Responsive design that works on both iOS and Android
 - Production-ready deployment with Vercel and EAS
 
-## 📱 Demo
+## Demo
 
-<details>
-<summary>▶️ Click to view demo video</summary>
 
-https://github.com/zrebhi/SwiftyCompanion/demo.mp4
+<center><video src="https://github.com/user-attachments/assets/586b34ae-2b2f-4452-9589-239d600e72f4"></video></center>
 
-</details>
 
-## Running the App on Your Phone
+## 📱 Running the App on Your Phone
 
 You can run SwiftyCompanion directly on your device using the Expo Go app:
 
