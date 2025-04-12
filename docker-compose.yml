@@ -26,4 +26,3 @@ services:
     stdin_open: true
     tty: true
     env_file: .env
-    command: bash -c "vercel dev --listen 3000"

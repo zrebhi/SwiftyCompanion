@@ -4,17 +4,17 @@ export default {
   version: "1.0.0",
   orientation: "default",
   icon: "./assets/images/icon.png",
-  scheme: "swiftycompanion", // Add scheme here
+  scheme: "swiftycompanion",
   userInterfaceStyle: "automatic",
-  newArchEnabled: true, // Add newArchEnabled here
+  newArchEnabled: true,
 
   extra: {
     CLIENT_ID: process.env.CLIENT_ID,
     CLIENT_SECRET: process.env.CLIENT_SECRET,
-    IP_ADDRESS: process.env.IP_ADDRESS,
-    PROJECT_LOCAL_API: process.env.LOCAL_API,
-    PROJECT_LOCAL_API_PORT: process.env.PROJECT_LOCAL_API_PORT,
-    PROJECT_API_URL: process.env.VERCEL_API_URL,
+    IP_ADDRESS: process.env.IP_ADDRESS || "localhost",
+    PROJECT_LOCAL_API: process.env.PROJECT_LOCAL_API || "FALSE",
+    PROJECT_LOCAL_API_PORT: process.env.PROJECT_LOCAL_API_PORT || 3000,
+    PROJECT_API_URL: process.env.PROJECT_API_URL || "https://https://swifty-api.vercel.app/",
     eas: {
       projectId: "6b82f6c9-afb7-467f-ade4-ede7ace16ecf",
     },
