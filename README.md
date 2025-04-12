@@ -18,7 +18,7 @@ This project has been successfully completed and includes:
 <details>
 <summary>▶️ Click to view demo video</summary>
 
-https://github.com/zrebhi/SwiftyCompanion/demo.mp4
+(https://github.com/user-attachments/assets/586b34ae-2b2f-4452-9589-239d600e72f4)
 
 </details>
 
