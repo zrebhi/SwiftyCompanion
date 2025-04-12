@@ -15,13 +15,6 @@ NC='\033[0m' # No Color
 
 echo -e "${BLUE}Loading configuration from .env file...${NC}"
 
-# Convert to lowercase for comparison
-PROJECT_LOCAL_API=$(echo "$PROJECT_LOCAL_API" | tr '[:upper:]' '[:lower:]')
-
-# Set default port if not specified
-PROJECT_LOCAL_API_PORT=${PROJECT_LOCAL_API_PORT:-3000}
-echo -e "${BLUE}Using API port: ${YELLOW}$PROJECT_LOCAL_API_PORT${NC}"
-
 # Stop any running containers
 echo -e "${YELLOW}Stopping any running containers...${NC}"
 docker-compose down
@@ -57,9 +50,14 @@ launch_terminal() {
   return 1
 }
 
+
+# Convert to lowercase for comparison
+PROJECT_LOCAL_API=$(echo "$PROJECT_LOCAL_API" | tr '[:upper:]' '[:lower:]')
 # Conditionally start API container
 if [ "$PROJECT_LOCAL_API" = "true" ]; then
-  echo -e "${YELLOW}Starting local API service...${NC}"
+  # Set default port if not specified
+  PROJECT_LOCAL_API_PORT=${PROJECT_LOCAL_API_PORT:-3000}
+  echo -e "${YELLOW}Starting local API service on port ${GREEN}$PROJECT_LOCAL_API_PORT${NC}${NC}"
   docker-compose up -d --build api
   
   # Launch terminal for API

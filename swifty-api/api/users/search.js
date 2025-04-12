@@ -1,5 +1,6 @@
 const axios = require("axios");
 const { tokenManager } = require("../utils/tokenManager");
+const { retryRateLimitedRequest } = require("../utils/retryRateLimitedRequest");
 
 /**
  * Serverless function handler for user search
@@ -59,8 +60,8 @@ async function handleUserSearch(req, token) {
   params.append("query", q);
 
   const lastIndex = q.length - 1;
-  q.charCodeAt(lastIndex)
-  
+  q.charCodeAt(lastIndex);
+
   // Increment the last character (works for 'z' -> '{', 'y' -> 'z', etc.)
   const endChar = String.fromCharCode(q.charCodeAt(lastIndex) + 1);
   let endQuery;
@@ -71,8 +72,8 @@ async function handleUserSearch(req, token) {
   } else {
     endQuery = q.slice(0, lastIndex) + endChar;
   }
-  
-  console.log('lastLetter:', String.fromCharCode(q.charCodeAt(lastIndex)));
+
+  console.log("lastLetter:", String.fromCharCode(q.charCodeAt(lastIndex)));
   console.log(`range: ${q},${endQuery}`); // For q="az", outputs "az,a{"
   params.append("range[login]", `${q},${endQuery}`);
 
@@ -83,9 +84,11 @@ async function handleUserSearch(req, token) {
   console.log("API URL:", apiUrl);
 
   try {
-    const response = await axios.get(apiUrl, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
+    const response = await retryRateLimitedRequest(() =>
+      axios.get(apiUrl, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+    );
 
     const results = response.data || [];
 

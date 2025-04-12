@@ -1,5 +1,6 @@
 const axios = require("axios");
 const { tokenManager } = require("../utils/tokenManager");
+const { retryRateLimitedRequest } = require("../utils/retryRateLimitedRequest");
 
 // Serverless function handler
 module.exports = async (req, res) => {
@@ -22,11 +23,10 @@ module.exports = async (req, res) => {
   try {
     const token = await tokenManager.getValidToken();
 
-    const response = await axios.get(
-      `https://api.intra.42.fr/v2/users/${login}`,
-      {
+    const response = await retryRateLimitedRequest(() =>
+      axios.get(`https://api.intra.42.fr/v2/users/${login}`, {
         headers: { Authorization: `Bearer ${token}` },
-      }
+      })
     );
 
     return res.status(200).json(response.data);
