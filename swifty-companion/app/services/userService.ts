@@ -1,5 +1,4 @@
 import axios from "axios";
-import Constants from "expo-constants";
 import ENV from "../utils/EnvValidation";
 
 /**

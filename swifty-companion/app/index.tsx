@@ -14,6 +14,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import colors from "../constants/colors";
 import LogoSection from "./components/index/LogoSection";
 import SearchForm from "./components/index/SearchForm";
+import { ScrollView } from "react-native-gesture-handler";
 
 /**
  * Main component for the search screen
@@ -24,15 +25,17 @@ import SearchForm from "./components/index/SearchForm";
 export default function Index() {
   return (
     <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
-        <StatusBar
-          barStyle="light-content"
-          backgroundColor="#121212"
-          translucent={false}
-        />
-        <LogoSection />
-        <SearchForm />
-      </View>
+      <ScrollView>
+        <View style={styles.container}>
+          <StatusBar
+            barStyle="light-content"
+            backgroundColor="#121212"
+            translucent={false}
+          />
+          <LogoSection />
+          <SearchForm />
+        </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
