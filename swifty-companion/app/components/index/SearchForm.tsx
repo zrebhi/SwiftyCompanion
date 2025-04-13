@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { View, StyleSheet, Alert } from "react-native";
 import { Formik } from "formik";
 import * as Yup from "yup";
@@ -16,11 +16,10 @@ import userService from "../../services/userService";
  */
 const LoginSchema = Yup.object().shape({
   login: Yup.string()
-    .required("Please enter a login to search")
     .transform((value) => value.trim().toLowerCase())
     .matches(
-      /^[a-z0-9_-]{2,20}$/i,
-      "Login must be 2-20 characters and contain only letters, numbers, underscores, or hyphens"
+      /^[a-z0-9_-]{1,20}$/i,
+      "Login must be 1-20 characters and contain only letters, numbers, underscores, or hyphens"
     ),
 });
 
@@ -55,44 +54,63 @@ const handleSearch = async (
 /**
  * Renders the search form
  * Includes input field, error message, and search button
+ * Coordinates between input and suggestions
  */
-export const SearchForm = () => (
-  <Formik
-    initialValues={{ login: "" }}
-    validationSchema={LoginSchema}
-    onSubmit={(values, formikHelpers) => {
-      const normalizedLogin = values.login.trim().toLowerCase();
-      handleSearch(normalizedLogin, formikHelpers);
-    }}
-  >
-    {({
-      handleChange,
-      handleSubmit,
-      handleBlur,
-      values,
-      errors,
-      touched,
-      isSubmitting,
-    }) => (
-      <View style={styles.searchContainer}>
-        <SearchInput
-          value={values.login}
-          onChange={(text) => handleChange("login")(text)}
-          onBlur={() => handleBlur("login")}
-          onSubmit={() => handleSubmit()}
-        />
+export const SearchForm = () => {
+  // Track if form is currently being submitted to prevent duplicate submissions
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-        <ErrorMessage error={touched.login ? errors.login : undefined} />
+  return (
+    <Formik
+      initialValues={{ login: "" }}
+      validationSchema={LoginSchema}
+      onSubmit={(values, formikHelpers) => {
+        if (isSubmitting) return;
+        setIsSubmitting(true);
+        const normalizedLogin = values.login.trim().toLowerCase();
+        handleSearch(normalizedLogin, {
+          setSubmitting: (submitting) => {
+            formikHelpers.setSubmitting(submitting);
+            setIsSubmitting(submitting);
+          },
+        });
+      }}
+    >
+      {({
+        handleChange,
+        handleSubmit,
+        handleBlur,
+        values,
+        errors,
+        touched,
+        isSubmitting: formikIsSubmitting,
+      }) => (
+        <View style={styles.searchContainer}>
+          <SearchInput
+            value={values.login}
+            onChange={(text) => handleChange("login")(text)}
+            onBlur={() => handleBlur("login")}
+            onSubmit={() => {
+              if (!isSubmitting) handleSubmit();
+            }}
+          />
 
-        <SearchButton
-          onPress={() => handleSubmit()}
-          isDisabled={isSubmitting || !values.login.trim()}
-          isLoading={isSubmitting}
-        />
-      </View>
-    )}
-  </Formik>
-);
+          <ErrorMessage error={touched.login ? errors.login : undefined} />
+
+          <SearchButton
+            onPress={() => {
+              if (!isSubmitting) handleSubmit();
+            }}
+            isDisabled={
+              isSubmitting || formikIsSubmitting || !values.login.trim()
+            }
+            isLoading={isSubmitting || formikIsSubmitting}
+          />
+        </View>
+      )}
+    </Formik>
+  );
+};
 
 const styles = StyleSheet.create({
   searchContainer: {

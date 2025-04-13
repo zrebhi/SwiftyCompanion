@@ -1,5 +1,5 @@
 /**
- * Simple retry function with exponential backoff for rate limited requests
+ * Simple retry function for rate limited requests
  * @param {Function} requestFn - Function that returns a promise for the request
  * @param {number} maxRetries - Maximum number of retry attempts
  * @returns {Promise} - Promise that resolves with the successful response
