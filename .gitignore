@@ -29,9 +29,7 @@ yarn-error.log*
 notes.txt
 api-data-zrebhi-2025-04-08T03-06-26-602Z.json
 SearchSuggestions_RoadMap.md
-CLAUDE.md
-context.md
+context/
 swifty-api/tests
 .llm-context
-demo.webm
 .idea
