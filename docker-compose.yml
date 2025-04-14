@@ -1,8 +1,8 @@
 services:
   app:
     build:
-      context: .
-      dockerfile: ./swifty-companion/Dockerfile
+      context: ./swifty-companion
+      dockerfile: Dockerfile
     container_name: swifty-companion
     volumes:
       - ./swifty-companion:/swifty-companion
@@ -17,8 +17,8 @@ services:
 
   api:
     build:
-      context: .
-      dockerfile: ./swifty-api/Dockerfile
+      context: ./swifty-api
+      dockerfile: Dockerfile
     container_name: swifty-api
     volumes:
       - ./swifty-api:/swifty-api

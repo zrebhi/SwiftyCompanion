@@ -8,8 +8,5 @@ RUN apt-get update && apt-get install -y bash git
 # Install global tools
 RUN npm install -g npm@latest vercel@latest eas-cli@latest
 
-# Install all dependencies including expo
-RUN yarn install
-
 # Fix permissions
 RUN chmod 777 /swifty-companion

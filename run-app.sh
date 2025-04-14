@@ -61,7 +61,7 @@ if [ "$PROJECT_LOCAL_API" = "true" ]; then
   docker compose up -d --build api
   
   # Launch terminal for API
-  if launch_terminal "Swifty API - Vercel" "docker exec -it swifty-api bash -c 'cd /swifty-api && vercel dev --listen ${PROJECT_LOCAL_API_PORT}'"; then
+  if launch_terminal "Swifty API - Vercel" "docker compose exec -it api bash -c 'cd /swifty-api && vercel dev --listen ${PROJECT_LOCAL_API_PORT}'"; then
     echo -e "${GREEN}Launched Vercel API terminal!${NC}"
   else
     echo -e "${RED}Failed to launch API terminal!${NC}"
@@ -72,7 +72,7 @@ fi
 
 # Launch terminal for app (always)
 echo -e "${GREEN}Launching Expo development server...${NC}"
-docker exec -it swifty-companion bash -c 'cd /swifty-companion && npx expo start --offline';
+docker compose exec -it app bash -c 'cd /swifty-companion && yarn add expo && npx expo start --offline';
 echo -e "${YELLOW}Expo server exited.${NC}"
 
 # Prompt user to stop all containers
