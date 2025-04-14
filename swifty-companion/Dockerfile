@@ -2,14 +2,14 @@ FROM node:bullseye-slim
 
 WORKDIR /swifty-companion
 
+# Install dependencies
 RUN apt-get update && apt-get install -y bash git
 
-# Install global tools except for expo-cli which is now deprecated
+# Install global tools
 RUN npm install -g npm@latest vercel@latest eas-cli@latest
 
-RUN yarn add expo
+# Install all dependencies including expo
+RUN yarn install
 
-# Install common React Native dependencies
-RUN npm install axios react-native-app-auth react-native-safe-area-context expo-secure-store expo-router formik yup
-
+# Fix permissions
 RUN chmod 777 /swifty-companion

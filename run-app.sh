@@ -17,11 +17,11 @@ echo -e "${BLUE}Loading configuration from .env file...${NC}"
 
 # Stop any running containers
 echo -e "${YELLOW}Stopping any running containers...${NC}"
-docker-compose down
+docker compose down
 
 # Build and start app container
 echo -e "${YELLOW}Building and starting app container...${NC}"
-docker-compose up -d --build app
+docker compose up -d --build app
 
 # Function to detect the terminal emulator
 launch_terminal() {
@@ -58,7 +58,7 @@ if [ "$PROJECT_LOCAL_API" = "true" ]; then
   # Set default port if not specified
   PROJECT_LOCAL_API_PORT=${PROJECT_LOCAL_API_PORT:-3000}
   echo -e "${YELLOW}Starting local API service on port ${GREEN}$PROJECT_LOCAL_API_PORT${NC}${NC}"
-  docker-compose up -d --build api
+  docker compose up -d --build api
   
   # Launch terminal for API
   if launch_terminal "Swifty API - Vercel" "docker exec -it swifty-api bash -c 'cd /swifty-api && vercel dev --listen ${PROJECT_LOCAL_API_PORT}'"; then
@@ -81,10 +81,10 @@ read -n 1 -r
 echo
 if [[ $REPLY =~ ^[Yy]$ ]]; then
   echo -e "${YELLOW}Stopping all containers...${NC}"
-  docker-compose down
+  docker compose down
   echo -e "${GREEN}All containers stopped successfully.${NC}"
 else
-  echo -e "${BLUE}Containers are still running. You can stop them later with 'docker-compose down'.${NC}"
+  echo -e "${BLUE}Containers are still running. You can stop them later with 'docker compose down'.${NC}"
 fi
 
 echo -e "${GREEN}Thank you for using Swifty Companion!${NC}"
