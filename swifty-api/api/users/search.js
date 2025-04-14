@@ -1,18 +1,32 @@
-const axios = require("axios");
-const { tokenManager } = require("../utils/tokenManager");
-const { retryRateLimitedRequest } = require("../utils/retryRateLimitedRequest");
+// swifty-api/api/users/search.js
+const { createClient } = require('@supabase/supabase-js');
+
+// Initialize Supabase client - Use anon key for client-facing API
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
+
+// Basic validation for Supabase env vars
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  console.error("API Search Error: Missing Supabase environment variables (SUPABASE_URL, SUPABASE_ANON_KEY).");
+}
+const supabase = SUPABASE_URL && SUPABASE_ANON_KEY ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+
+const MAX_SUGGESTIONS = 10; // Limit the number of suggestions returned
 
 /**
- * Serverless function handler for user search
- * Handles CORS, authentication with the 42 API, and error responses
+ * Serverless API endpoint handler for searching users in the cache.
+ * Searches by login prefix or displayname similarity.
  *
- * @param {object} req - HTTP request object
- * @param {object} res - HTTP response object
- * @returns {Promise<void>}
+ * @async
+ * @param {object} req - Vercel Request object
+ * @param {object} req.query - Query parameters
+ * @param {string} req.query.q - The search query term.
+ * @param {object} res - Vercel Response object
+ * @returns {object} HTTP response with an array of user suggestions or error message
  */
 module.exports = async (req, res) => {
   // Set CORS headers
-  res.setHeader("Access-Control-Allow-Origin", "*");
+  res.setHeader("Access-Control-Allow-Origin", "*"); // Adjust in production
   res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
@@ -21,96 +35,67 @@ module.exports = async (req, res) => {
     return res.status(200).end();
   }
 
+  // Only allow GET method
+  if (req.method !== "GET") {
+    res.setHeader("Allow", ["GET", "OPTIONS"]);
+    return res.status(405).json({ error: "Method Not Allowed" });
+  }
+
+  // Check if Supabase client initialized correctly
+  if (!supabase) {
+     console.error("API Search Error: Supabase client not initialized.");
+     return res.status(500).json({ error: "Server configuration error." });
+  }
+
+  const { q } = req.query;
+
+  // Validate query parameter
+  if (!q || typeof q !== 'string' || q.trim().length === 0) {
+    return res.status(400).json({ error: "Missing or empty query parameter 'q'." });
+  }
+
+  const searchTerm = q.trim();
+  // Prepare search patterns for LIKE/ILIKE
+  const loginPattern = `${searchTerm}%`; // Prefix search for login
+  const displayNamePattern = `%${searchTerm}%`; // Contains search for display name
+
   try {
-    // Get a valid token for API requests
-    const token = await tokenManager.getValidToken();
+    console.log(`Searching for users matching: '${searchTerm}'`);
 
-    const suggestions = await handleUserSearch(req, token);
-    return res.status(200).json(suggestions);
+    // Query Supabase cache
+    // Select only necessary fields for suggestions
+    // Use OR to match either login prefix or displayname containment
+    // Use ILIKE for case-insensitive displayname search
+    // Limit results
+    const { data, error } = await supabase
+      .from('users_cache')
+      .select('login, displayname, image_url')
+      .or(`login.like.${loginPattern},displayname.ilike.${displayNamePattern}`) // Note: .like is case-sensitive, .ilike is case-insensitive
+      .limit(MAX_SUGGESTIONS);
+
+    if (error) {
+      console.error(`Supabase search error for query '${searchTerm}':`, error.message);
+      return res.status(500).json({ error: "Database query failed." });
+    }
+
+    // Transform data to match expected frontend structure (UserSuggestion-like)
+    const suggestions = (data || []).map(user => ({
+      login: user.login,
+      displayname: user.displayname,
+      // Create the nested image structure defined in the UserSuggestion type
+      image: {
+          versions: {
+              small: user.image_url // Map image_url to image.versions.small
+          }
+      }
+      // id is not strictly needed if login is used as key, omitting for now
+    }));
+
+    console.log(`Found and transformed ${suggestions.length} suggestions for '${searchTerm}'`);
+    return res.status(200).json(suggestions); // Return transformed data
+
   } catch (error) {
-    console.error("Error handling search request:", error);
-
-    const status = error.status || error.response?.status || 500;
-    const message =
-      error.message || error.response?.data?.message || "Internal server error";
-
-    return res.status(status).json({ error: message });
+    console.error(`Unexpected error during search for '${searchTerm}':`, error);
+    return res.status(500).json({ error: "Internal server error." });
   }
 };
-
-/**
- * Handle user search requests against the 42 API
- * Searches for users based on the login name query parameter
- *
- * @param {object} req - HTTP request object
- * @param {string} token - Valid OAuth token for the 42 API
- * @returns {Promise<Array>} Array of user suggestion objects
- * @throws {object} Error with status code and message if search fails
- */
-async function handleUserSearch(req, token) {
-  const { q, limit = 5 } = req.query;
-
-  if (!q) {
-    throw { status: 400, message: "Search query (q) is required" };
-  }
-
-  // Build query parameters for the 42 API
-  const params = new URLSearchParams();
-
-  params.append("query", q);
-
-  const lastIndex = q.length - 1;
-  q.charCodeAt(lastIndex);
-
-  // Increment the last character (works for 'z' -> '{', 'y' -> 'z', etc.)
-  const endChar = String.fromCharCode(q.charCodeAt(lastIndex) + 1);
-  let endQuery;
-  // Replace the last character with the incremented value
-  if (q.charAt(lastIndex) === "z") {
-    endQuery = q + "z";
-    console.log("endQuery:", endQuery);
-  } else {
-    endQuery = q.slice(0, lastIndex) + endChar;
-  }
-
-  console.log("lastLetter:", String.fromCharCode(q.charCodeAt(lastIndex)));
-  console.log(`range: ${q},${endQuery}`); // For q="az", outputs "az,a{"
-  params.append("range[login]", `${q},${endQuery}`);
-
-  params.append("sort", "login");
-  params.append("page[size]", limit);
-
-  const apiUrl = `https://api.intra.42.fr/v2/users?${params.toString()}`;
-  console.log("API URL:", apiUrl);
-
-  try {
-    const response = await retryRateLimitedRequest(() =>
-      axios.get(apiUrl, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
-    );
-
-    const results = response.data || [];
-
-    // Extract only the needed fields to reduce payload size
-    const suggestions = results.map((user) => ({
-      id: user.id,
-      login: user.login,
-      displayname: user.displayname || user.login,
-      image: user.image,
-    }));
-    console.log("Search results:", results);
-
-    return suggestions;
-  } catch (error) {
-    console.error("Error searching 42 API:", error.message);
-    if (error.response) {
-      console.error("API error status:", error.response.status);
-      console.error(
-        "API error data:",
-        JSON.stringify(error.response.data, null, 2)
-      );
-    }
-    throw error;
-  }
-}

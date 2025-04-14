@@ -31,5 +31,5 @@ api-data-zrebhi-2025-04-08T03-06-26-602Z.json
 
 context/
 swifty-api/tests
-.llm-context
-.idea
+.llm-context/
+.idea/

@@ -45,7 +45,8 @@ const SearchSuggestions = ({
       ) : (
         <FlatList
           data={suggestions}
-          keyExtractor={(item) => item.id.toString()}
+          // Use login as the key, as it's unique and provided by the search API
+          keyExtractor={(item) => item.login}
           renderItem={({ item }) => (
             <SuggestionItem
               suggestion={item}
