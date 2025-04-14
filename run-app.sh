@@ -61,7 +61,7 @@ if [ "$PROJECT_LOCAL_API" = "true" ]; then
   docker compose up -d --build api
   
   # Launch terminal for API
-  if launch_terminal "Swifty API - Vercel" "docker compose exec -it api bash -c 'cd /swifty-api && vercel dev --listen ${PROJECT_LOCAL_API_PORT}'"; then
+  if launch_terminal "Swifty API - Vercel" "docker compose exec -it api bash -c 'npm install axios && vercel dev --listen ${PROJECT_LOCAL_API_PORT}'"; then
     echo -e "${GREEN}Launched Vercel API terminal!${NC}"
   else
     echo -e "${RED}Failed to launch API terminal!${NC}"
