@@ -1,21 +1,20 @@
 // swifty-api/api/users/search.js
 const { createClient } = require('@supabase/supabase-js');
 
-// Initialize Supabase client - Use anon key for client-facing API
+// Initialize Supabase client
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
 
-// Basic validation for Supabase env vars
 if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-  console.error("API Search Error: Missing Supabase environment variables (SUPABASE_URL, SUPABASE_ANON_KEY).");
+  console.error("API Search Error: Missing Supabase environment variables.");
 }
 const supabase = SUPABASE_URL && SUPABASE_ANON_KEY ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 
-const MAX_SUGGESTIONS = 10; // Limit the number of suggestions returned
+const MAX_SUGGESTIONS = 10;
 
 /**
  * Serverless API endpoint handler for searching users in the cache.
- * Searches by login prefix or displayname similarity.
+ * Searches by login prefix or displayname containment (case-insensitive).
  *
  * @async
  * @param {object} req - Vercel Request object
@@ -55,22 +54,18 @@ module.exports = async (req, res) => {
   }
 
   const searchTerm = q.trim();
-  // Prepare search patterns for LIKE/ILIKE
-  const loginPattern = `${searchTerm}%`; // Prefix search for login
-  const displayNamePattern = `%${searchTerm}%`; // Contains search for display name
+  // Prepare search patterns for ILIKE (case-insensitive)
+  const loginPattern = `${searchTerm}%`; // Prefix search
+  const displayNamePattern = `%${searchTerm}%`; // Contains search
 
   try {
     console.log(`Searching for users matching: '${searchTerm}'`);
 
-    // Query Supabase cache
-    // Select only necessary fields for suggestions
-    // Use OR to match either login prefix or displayname containment
-    // Use ILIKE for case-insensitive displayname search
-    // Limit results
     const { data, error } = await supabase
       .from('users_cache')
       .select('login, displayname, image_url')
-      .or(`login.like.${loginPattern},displayname.ilike.${displayNamePattern}`) // Note: .like is case-sensitive, .ilike is case-insensitive
+      // Use ILIKE for case-insensitive search on both fields
+      .or(`login.ilike.${loginPattern},displayname.ilike.${displayNamePattern}`)
       .limit(MAX_SUGGESTIONS);
 
     if (error) {
@@ -82,16 +77,15 @@ module.exports = async (req, res) => {
     const suggestions = (data || []).map(user => ({
       login: user.login,
       displayname: user.displayname,
-      // Create the nested image structure defined in the UserSuggestion type
+      // Create the nested image structure expected by the frontend
       image: {
           versions: {
-              small: user.image_url // Map image_url to image.versions.small
+              small: user.image_url
           }
       }
-      // id is not strictly needed if login is used as key, omitting for now
     }));
 
-    console.log(`Found and transformed ${suggestions.length} suggestions for '${searchTerm}'`);
+    console.log(`Found ${suggestions.length} suggestions for '${searchTerm}'`);
     return res.status(200).json(suggestions); // Return transformed data
 
   } catch (error) {

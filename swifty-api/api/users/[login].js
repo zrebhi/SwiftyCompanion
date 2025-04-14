@@ -1,166 +1,173 @@
 const axios = require("axios");
-const { createClient } = require("@supabase/supabase-js");
+const { createClient } = require('@supabase/supabase-js');
 const { tokenManager } = require("../utils/tokenManager");
-// Note: retryRateLimitedRequest might not be needed here anymore if we primarily hit the cache,
-// but we'll keep it for the fallback/forceRefresh path for now.
 const { retryRateLimitedRequest } = require("../utils/retryRateLimitedRequest");
 
-// Initialize Supabase client - Use anon key for client-facing API
+// --- Initialization ---
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
+const API_BASE_URL = "https://api.intra.42.fr/v2";
 
-// Basic validation for Supabase env vars
-if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-  console.error(
-    "API Error: Missing Supabase environment variables (SUPABASE_URL, SUPABASE_ANON_KEY)."
-  );
-  // Avoid exiting process in serverless function, return error instead
-}
-// Initialize only if vars are present
-const supabase =
-  SUPABASE_URL && SUPABASE_ANON_KEY
+// Initialize Supabase client only if env vars are present
+const supabase = SUPABASE_URL && SUPABASE_ANON_KEY
     ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
     : null;
 
-const API_BASE_URL = "https://api.intra.42.fr/v2";
 
-/**
- * Serverless API endpoint handler for retrieving 42 user data.
- * Checks Supabase cache first, then falls back to 42 API.
- * Supports force refresh via query parameter.
- *
- * @async
- * @param {object} req - Vercel Request object
- * @param {object} req.query - Query parameters
- * @param {string} req.query.login - The 42 login to look up
- * @param {string} [req.query.forceRefresh] - If 'true', bypass cache and fetch fresh data.
- * @param {object} res - Vercel Response object
- * @returns {object} HTTP response with user data or error message
- */
+// --- Main Handler ---
 module.exports = async (req, res) => {
-  // Set CORS headers for browser access
-  res.setHeader("Access-Control-Allow-Origin", "*"); // Adjust in production for security
+
+  console.log(`Received request: ${req.method} ${req.url}`);
+
+  // Set CORS headers
+  res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization"); // Allow Authorization if needed by client
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
 
-  // Handle OPTIONS preflight request
-  if (req.method === "OPTIONS") {
-    return res.status(200).end();
+  const validation = validateRequest(req);
+  if (validation.error) {
+      if (validation.error.status === 405) res.setHeader("Allow", ["GET", "OPTIONS"]);
+      return res.status(validation.error.status).json({ error: validation.error.message });
   }
-
-  // Only allow GET method
-  if (req.method !== "GET") {
-    res.setHeader("Allow", ["GET", "OPTIONS"]);
-    return res.status(405).json({ error: "Method Not Allowed" });
-  }
-
-  // Check if Supabase client initialized correctly
-  if (!supabase) {
-    console.error(
-      "API Error: Supabase client not initialized due to missing env vars."
-    );
-    return res.status(500).json({ error: "Server configuration error." });
-  }
-
-  const { login, forceRefresh } = req.query;
-  const shouldForceRefresh = forceRefresh === "true";
-
-  // Validate login parameter
-  if (
-    !login ||
-    typeof login !== "string" ||
-    !/^[a-zA-Z0-9_-]{2,20}$/.test(login)
-  ) {
-    return res
-      .status(400)
-      .json({ error: "Invalid or missing login parameter." });
-  }
+  const { login } = validation;
+  const shouldForceRefresh = req.query.forceRefresh === 'true';
 
   try {
-    // --- Step 1: Check Cache (unless forceRefresh is true) ---
-    if (!shouldForceRefresh) {
-      console.log(`Checking cache for user: ${login}`);
-      const { data: cachedUser, error: selectError } = await supabase
-        .from("users_cache")
-        .select("*") // Select all columns for the cached data
-        .eq("login", login)
-        .maybeSingle();
+      let userData = null;
 
-      if (selectError) {
-        console.error(
-          `Supabase select error for ${login}:`,
-          selectError.message
-        );
-        // Don't fail the request, just proceed to API fetch as fallback
-      } else if (cachedUser) {
-        console.log(`Cache hit for user: ${login}`);
-        // Transform cached data to match the expected nested image structure
-        const transformedCachedUser = {
-          ...cachedUser, // Spread all existing cached fields
-          image: {
-            // Create the nested image object
-            link: cachedUser.image_url, // Map image_url to image.link
-          },
-        };
-        // Remove the now redundant flat image_url if desired (optional)
-        // delete transformedCachedUser.image_url;
-
-        // Optionally add cache headers (e.g., Cache-Control, ETag)
-        return res.status(200).json(transformedCachedUser);
+      // Attempt to get from cache unless forcing refresh
+      if (!shouldForceRefresh) {
+          userData = await getUserFromCache(login);
       } else {
-        console.log(`Cache miss for user: ${login}`);
+           console.log(`Force refresh requested for user: ${login}`);
       }
-    } else {
-      console.log(`Force refresh requested for user: ${login}`);
+
+      // If not found in cache or forcing refresh, fetch from API
+      if (!userData) {
+          const apiUserData = await fetchUserFromAPI(login);
+          upsertUserToCache(apiUserData); // Update cache in background
+          userData = apiUserData; // Use fresh API data for the response
+      }
+
+      // Return the determined user data (either transformed cached or fresh API data)
+      return res.status(200).json(userData);
+
+  } catch (error) {
+      console.error(`Error processing request for ${login}:`, error);
+      const status = error.response?.status || 500;
+      // Use a generic message for client-facing errors unless it's a 404
+      const message = status === 404 ? "User not found" : "Failed to retrieve user data.";
+      return res.status(status).json({ error: message });
+  }
+};
+
+
+// --- Helper Functions ---
+
+/**
+ * Validates the incoming request method and login parameter.
+ * @param {object} req - Vercel Request object
+ * @returns {{login: string | null, error: {status: number, message: string} | null}}
+ */
+function validateRequest(req) {
+    if (req.method === "OPTIONS") {
+        return { login: null, error: { status: 200, message: "OPTIONS preflight" } };
+    }
+    if (req.method !== "GET") {
+        return { login: null, error: { status: 405, message: "Method Not Allowed" } };
+    }
+    if (!supabase) {
+        console.error("API Error: Supabase client not initialized.");
+        return { login: null, error: { status: 500, message: "Server configuration error." } };
     }
 
-    // --- Step 2: Fetch from 42 API (if cache miss or forceRefresh) ---
+    const { login } = req.query;
+    if (!login || typeof login !== 'string' || !/^[a-zA-Z0-9_-]{2,20}$/.test(login)) {
+        return { login: null, error: { status: 400, message: "Invalid or missing login parameter." } };
+    }
+    return { login, error: null };
+}
+
+/**
+ * Attempts to retrieve user data from the Supabase cache.
+ * @param {string} login - The user login.
+ * @returns {Promise<object | null>} - The cached user data (transformed) or null if not found/error.
+ */
+async function getUserFromCache(login) {
+    console.log(`Checking cache for user: ${login}`);
+    try {
+        const { data: cachedUser, error: selectError } = await supabase
+            .from('users_cache')
+            .select('*')
+            .eq('login', login)
+            .maybeSingle();
+
+        if (selectError) {
+            console.error(`Supabase select error for ${login}:`, selectError.message);
+            return null; // Treat select error as cache miss
+        }
+
+        if (cachedUser) {
+            console.log(`Cache hit for user: ${login}`);
+            // Transform to match expected frontend structure
+            return {
+                ...cachedUser,
+                image: { link: cachedUser.image_url }
+            };
+        }
+    } catch (cacheError) {
+        console.error(`Unexpected error checking cache for ${login}:`, cacheError);
+    }
+    console.log(`Cache miss for user: ${login}`);
+    return null;
+}
+
+/**
+ * Fetches fresh user data from the 42 API.
+ * @param {string} login - The user login.
+ * @returns {Promise<object>} - The user data from the API.
+ * @throws {Error} - If API fetch fails.
+ */
+async function fetchUserFromAPI(login) {
     console.log(`Fetching from 42 API for user: ${login}`);
     const token = await tokenManager.getValidToken();
     const apiResponse = await retryRateLimitedRequest(() =>
-      axios.get(`${API_BASE_URL}/users/${login}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      })
+        axios.get(`${API_BASE_URL}/users/${login}`, {
+            headers: { Authorization: `Bearer ${token}` },
+        })
     );
-    const userData = apiResponse.data;
+    return apiResponse.data;
+}
 
-    // --- Step 3: Upsert into Cache (async, don't wait for it to return response) ---
+/**
+ * Upserts user data into the Supabase cache asynchronously.
+ * Does not wait for completion and logs errors.
+ * @param {object} userData - User data fetched from the 42 API.
+ */
+function upsertUserToCache(userData) {
     const dataToUpsert = {
-      login: userData.login,
-      displayname: userData.displayname,
-      email: userData.email,
-      image_url: userData.image?.link,
-      wallet: userData.wallet,
-      correction_points: userData.correction_point,
-      cursus_users: userData.cursus_users,
-      projects_users: userData.projects_users,
-      last_refreshed_at: new Date().toISOString(),
+        login: userData.login,
+        displayname: userData.displayname,
+        email: userData.email,
+        image_url: userData.image?.link, // Store the direct link
+        wallet: userData.wallet,
+        correction_points: userData.correction_point,
+        cursus_users: userData.cursus_users,
+        projects_users: userData.projects_users,
+        last_refreshed_at: new Date().toISOString(),
     };
 
-    // Perform upsert in background - don't await it to speed up response to client
+    // Perform upsert in background
     supabase
-      .from("users_cache")
-      .upsert(dataToUpsert, { onConflict: "login" })
-      .then(({ error: upsertError }) => {
-        if (upsertError) {
-          console.error(
-            `Supabase background upsert error for ${login}:`,
-            upsertError.message
-          );
-        } else {
-          console.log(`Successfully upserted ${login} in background.`);
-        }
-      });
+        .from('users_cache')
+        .upsert(dataToUpsert, { onConflict: 'login' })
+        .then(({ error: upsertError }) => {
+            if (upsertError) {
+                console.error(`Supabase background upsert error for ${userData.login}:`, upsertError.message);
+            } else {
+                console.log(`Successfully upserted ${userData.login} in background.`);
+            }
+        });
+}
 
-    // --- Step 4: Return API Response ---
-    // IMPORTANT: Return the *original* API data, not the potentially modified dataToUpsert
-    return res.status(200).json(userData);
-  } catch (error) {
-    console.error(`Error processing request for ${login}:`, error);
 
-    const status = error.response?.status || 500;
-    const message = error.response?.data?.message || "Server error";
-
-    return res.status(status).json({ error: message });
-  }
-};

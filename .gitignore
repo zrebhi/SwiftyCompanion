@@ -33,3 +33,4 @@ context/
 swifty-api/tests
 .llm-context/
 .idea/
+api_response

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React from "react"; // Removed useState
 import { View, StyleSheet, Alert } from "react-native";
 import { Formik } from "formik";
 import * as Yup from "yup";
@@ -29,26 +29,18 @@ const LoginSchema = Yup.object().shape({
  *
  * @param {string} login - The login to search for.
  * @param {object} helpers - Formik helpers for managing form state.
- * @param {function} helpers.setSubmitting - Function to toggle the submitting state.
+ * @param {function} setSubmitting - Formik's function to toggle the submitting state (though we won't need async/await here anymore).
  */
-const handleSearch = async (
+const handleSearch = ( // Removed async
   login: string,
-  { setSubmitting }: { setSubmitting: (isSubmitting: boolean) => void }
+  setSubmitting: (isSubmitting: boolean) => void
 ) => {
-  try {
-    await userService.searchUser(login);
-    router.push({
-      pathname: "profile",
-      params: { login },
-    });
-  } catch (error) {
-    Alert.alert(
-      "Search Error",
-      error instanceof Error ? error.message : "An unknown error occurred"
-    );
-  } finally {
-    setSubmitting(false);
-  }
+  router.push({
+    pathname: "profile",
+    params: { login },
+  });
+  // It's good practice to set submitting to false immediately after navigation is initiated.
+  setSubmitting(false);
 };
 
 /**
@@ -57,23 +49,18 @@ const handleSearch = async (
  * Coordinates between input and suggestions
  */
 export const SearchForm = () => {
-  // Track if form is currently being submitted to prevent duplicate submissions
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  // Removed local isSubmitting state
 
   return (
     <Formik
       initialValues={{ login: "" }}
       validationSchema={LoginSchema}
-      onSubmit={(values, formikHelpers) => {
-        if (isSubmitting) return;
-        setIsSubmitting(true);
+      // Use Formik's isSubmitting internally to prevent double submission
+      onSubmit={(values, { setSubmitting }) => { // Removed async
+        // Formik handles preventing double submits while isSubmitting is true
         const normalizedLogin = values.login.trim().toLowerCase();
-        handleSearch(normalizedLogin, {
-          setSubmitting: (submitting) => {
-            formikHelpers.setSubmitting(submitting);
-            setIsSubmitting(submitting);
-          },
-        });
+        // Pass Formik's setSubmitting directly to handleSearch
+        handleSearch(normalizedLogin, setSubmitting); // Removed await
       }}
     >
       {({
@@ -90,21 +77,18 @@ export const SearchForm = () => {
             value={values.login}
             onChange={(text) => handleChange("login")(text)}
             onBlur={() => handleBlur("login")}
-            onSubmit={() => {
-              if (!isSubmitting) handleSubmit();
-            }}
+            // Directly use Formik's handleSubmit for submission trigger
+            onSubmit={handleSubmit}
           />
 
           <ErrorMessage error={touched.login ? errors.login : undefined} />
 
           <SearchButton
-            onPress={() => {
-              if (!isSubmitting) handleSubmit();
-            }}
-            isDisabled={
-              isSubmitting || formikIsSubmitting || !values.login.trim()
-            }
-            isLoading={isSubmitting || formikIsSubmitting}
+            // Directly use Formik's handleSubmit for submission trigger
+            onPress={() => handleSubmit()}
+            // Rely solely on Formik's isSubmitting state
+            isDisabled={formikIsSubmitting || !values.login.trim()}
+            isLoading={formikIsSubmitting}
           />
         </View>
       )}
