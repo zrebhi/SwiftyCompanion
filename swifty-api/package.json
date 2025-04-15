@@ -1,12 +1,8 @@
 {
   "name": "swifty-api",
   "version": "1.0.0",
-  "type": "commonjs",
-  "engines": {
-    "node": "20.x"
-  },
   "dependencies": {
     "axios": "latest",
-    "vercel": "^41.6.0"
+    "vercel": "latest"
   }
 }

@@ -53,13 +53,11 @@ launch_terminal() {
 
 # Convert to lowercase for comparison
 PROJECT_LOCAL_API=$(echo "$PROJECT_LOCAL_API" | tr '[:upper:]' '[:lower:]')
-docker compose build app
 # Conditionally start API container
 if [ "$PROJECT_LOCAL_API" = "true" ]; then
   # Set default port if not specified
   PROJECT_LOCAL_API_PORT=${PROJECT_LOCAL_API_PORT:-3000}
   echo -e "${YELLOW}Starting local API service on port ${GREEN}$PROJECT_LOCAL_API_PORT${NC}${NC}"
-  docker compose build api
   # Launch terminal for API
   if launch_terminal "Swifty API - Vercel" "docker compose run api bash -c 'npx vercel dev --listen ${PROJECT_LOCAL_API_PORT}'"; then
     echo -e "${GREEN}Launched Vercel API terminal!${NC}"
