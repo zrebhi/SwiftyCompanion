@@ -17,11 +17,11 @@ echo -e "${BLUE}Loading configuration from .env file...${NC}"
 
 # Stop any running containers
 echo -e "${YELLOW}Stopping any running containers...${NC}"
-docker-compose down
+docker compose down
 
 # Build and start app container
 echo -e "${YELLOW}Building and starting app container...${NC}"
-docker-compose up -d --build app
+docker compose up -d --build app
 
 # Function to detect the terminal emulator
 launch_terminal() {
@@ -57,11 +57,10 @@ PROJECT_LOCAL_API=$(echo "$PROJECT_LOCAL_API" | tr '[:upper:]' '[:lower:]')
 if [ "$PROJECT_LOCAL_API" = "true" ]; then
   # Set default port if not specified
   PROJECT_LOCAL_API_PORT=${PROJECT_LOCAL_API_PORT:-3000}
+  docker compose up -d --build api
   echo -e "${YELLOW}Starting local API service on port ${GREEN}$PROJECT_LOCAL_API_PORT${NC}${NC}"
-  docker-compose up -d --build api
-  
   # Launch terminal for API
-  if launch_terminal "Swifty API - Vercel" "docker exec -it swifty-api bash -c 'cd /swifty-api && vercel dev --listen ${PROJECT_LOCAL_API_PORT}'"; then
+  if launch_terminal "Swifty API - Vercel" "docker compose exec api bash -c 'npx vercel dev --listen ${PROJECT_LOCAL_API_PORT}'"; then
     echo -e "${GREEN}Launched Vercel API terminal!${NC}"
   else
     echo -e "${RED}Failed to launch API terminal!${NC}"
@@ -72,7 +71,7 @@ fi
 
 # Launch terminal for app (always)
 echo -e "${GREEN}Launching Expo development server...${NC}"
-docker exec -it swifty-companion bash -c 'cd /swifty-companion && npx expo start --offline';
+docker compose exec app bash -c 'npx expo start --offline';
 echo -e "${YELLOW}Expo server exited.${NC}"
 
 # Prompt user to stop all containers
@@ -81,10 +80,10 @@ read -n 1 -r
 echo
 if [[ $REPLY =~ ^[Yy]$ ]]; then
   echo -e "${YELLOW}Stopping all containers...${NC}"
-  docker-compose down
+  docker compose down
   echo -e "${GREEN}All containers stopped successfully.${NC}"
 else
-  echo -e "${BLUE}Containers are still running. You can stop them later with 'docker-compose down'.${NC}"
+  echo -e "${BLUE}Containers are still running. You can stop them later with 'docker compose down'.${NC}"
 fi
 
 echo -e "${GREEN}Thank you for using Swifty Companion!${NC}"

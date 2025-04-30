@@ -34,3 +34,6 @@ swifty-api/tests
 .llm-context/
 .idea/
 api_response
+.*
+roo_config
+.gitignore
