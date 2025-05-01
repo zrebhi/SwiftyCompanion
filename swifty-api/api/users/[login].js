@@ -7,12 +7,23 @@ const { retryRateLimitedRequest } = require("../utils/retryRateLimitedRequest");
 const SUPABASE_URL = process.env.SUPABASE_URL;
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
 const API_BASE_URL = "https://api.intra.42.fr/v2";
+const FULL_PROFILE_TTL = 3600000; // 1 hour in milliseconds
 
 // Initialize Supabase client only if env vars are present
 const supabase = SUPABASE_URL && SUPABASE_ANON_KEY
     ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
     : null;
 
+
+// --- Helper Function for Response Formatting ---
+function transformUserDataForResponse(userData) {
+    if (!userData) return null;
+    // Ensure image structure matches frontend expectation
+    // Handles both raw API data (userData.image.link) and cache data (userData.image_url)
+    const imageUrl = userData.image?.link || userData.image_url;
+    const { image_url, image, ...rest } = userData; // Remove original image/image_url
+    return { ...rest, image: { link: imageUrl } }; // Add formatted image field
+}
 
 // --- Main Handler ---
 module.exports = async (req, res) => {
@@ -27,32 +38,80 @@ module.exports = async (req, res) => {
   const validation = validateRequest(req);
   if (validation.error) {
       if (validation.error.status === 405) res.setHeader("Allow", ["GET", "OPTIONS"]);
+      // Handle OPTIONS preflight separately
+      if (validation.error.status === 200 && req.method === "OPTIONS") {
+          return res.status(200).end();
+      }
       return res.status(validation.error.status).json({ error: validation.error.message });
   }
   const { login } = validation;
-  const shouldForceRefresh = req.query.forceRefresh === 'true';
 
   try {
-      let userData = null;
+      const cachedUser = await getUserFromCache(login);
 
-      // Attempt to get from cache unless forcing refresh
-      if (!shouldForceRefresh) {
-          userData = await getUserFromCache(login);
-      } else {
-           console.log(`Force refresh requested for user: ${login}`);
+      // Case 1: Cache Miss
+      if (!cachedUser) {
+          console.log(`Cache miss for ${login}. Fetching from API.`);
+          try {
+              const apiUserData = await fetchUserFromAPI(login);
+              await upsertUserToCache(apiUserData); // Wait for cache update
+              return res.status(200).json(transformUserDataForResponse(apiUserData));
+          } catch (apiError) {
+              console.error(`API fetch failed for ${login} after cache miss:`, apiError.message);
+              const status = apiError.response?.status || 500;
+              const message = status === 404 ? "User not found" : "Failed to retrieve user data.";
+              return res.status(status).json({ error: message });
+          }
       }
 
-      // If not found in cache or forcing refresh, fetch from API
-      if (!userData) {
-          const apiUserData = await fetchUserFromAPI(login);
-          upsertUserToCache(apiUserData); // Update cache in background
-          userData = apiUserData; // Use fresh API data for the response
+      // Check if cache has full data (using projects_users as indicator)
+      // Ensure projects_users exists and is an array (could be null if fetched partially before)
+      const hasFullData = cachedUser.projects_users && Array.isArray(cachedUser.projects_users);
+      const isStale = !cachedUser.last_refreshed_at || (Date.now() - new Date(cachedUser.last_refreshed_at).getTime()) > FULL_PROFILE_TTL;
+
+      // Case 2: Cache Hit (Basic Info Only)
+      if (!hasFullData) {
+          console.log(`Cache hit for ${login} (basic info only). Fetching full profile from API.`);
+          try {
+              const apiUserData = await fetchUserFromAPI(login);
+              await upsertUserToCache(apiUserData); // Update cache with full data
+              return res.status(200).json(transformUserDataForResponse(apiUserData));
+          } catch (apiError) {
+              console.error(`API fetch failed for ${login} when fetching full profile:`, apiError.message);
+              // Don't return basic info if full profile fetch fails
+              const status = apiError.response?.status || 500;
+              const message = status === 404 ? "User not found" : "Failed to retrieve full user data.";
+              return res.status(status).json({ error: message });
+          }
       }
 
-      // Return the determined user data (either transformed cached or fresh API data)
-      return res.status(200).json(userData);
+      // Case 3: Cache Hit (Full Info Exists)
+      if (hasFullData) {
+          // Subcase 3a: Full Info is Fresh
+          if (!isStale) {
+              console.log(`Cache hit for ${login} (full info, fresh). Returning cached data.`);
+              return res.status(200).json(transformUserDataForResponse(cachedUser));
+          }
+          // Subcase 3b: Full Info is Stale
+          else {
+              console.log(`Cache hit for ${login} (full info, stale). Refreshing from API.`);
+              try {
+                  const apiUserData = await fetchUserFromAPI(login);
+                  await upsertUserToCache(apiUserData); // Update cache
+                  return res.status(200).json(transformUserDataForResponse(apiUserData));
+              } catch (apiError) {
+                  console.error(`API refresh failed for stale user ${login}. Returning stale data. Error:`, apiError.message);
+                  // Return stale data if refresh fails
+                  return res.status(200).json(transformUserDataForResponse(cachedUser));
+              }
+          }
+      }
 
-  } catch (error) {
+      // Fallback for unexpected scenarios (shouldn't be reached with current logic)
+      console.error(`Unexpected state reached for user ${login}.`);
+      return res.status(500).json({ error: "Internal server error." });
+
+  } catch (error) { // Catch errors from initial cache check or unexpected issues
       console.error(`Error processing request for ${login}:`, error);
       const status = error.response?.status || 500;
       // Use a generic message for client-facing errors unless it's a 404
@@ -70,6 +129,7 @@ module.exports = async (req, res) => {
  * @returns {{login: string | null, error: {status: number, message: string} | null}}
  */
 function validateRequest(req) {
+    // Allow OPTIONS for CORS preflight
     if (req.method === "OPTIONS") {
         return { login: null, error: { status: 200, message: "OPTIONS preflight" } };
     }
@@ -91,14 +151,14 @@ function validateRequest(req) {
 /**
  * Attempts to retrieve user data from the Supabase cache.
  * @param {string} login - The user login.
- * @returns {Promise<object | null>} - The cached user data (transformed) or null if not found/error.
+ * @returns {Promise<object | null>} - The RAW cached user data or null if not found/error.
  */
 async function getUserFromCache(login) {
     console.log(`Checking cache for user: ${login}`);
     try {
         const { data: cachedUser, error: selectError } = await supabase
             .from('users_cache')
-            .select('*')
+            .select('*') // Select all columns including last_refreshed_at, projects_users etc.
             .eq('login', login)
             .maybeSingle();
 
@@ -109,11 +169,7 @@ async function getUserFromCache(login) {
 
         if (cachedUser) {
             console.log(`Cache hit for user: ${login}`);
-            // Transform to match expected frontend structure
-            return {
-                ...cachedUser,
-                image: { link: cachedUser.image_url }
-            };
+            return cachedUser; // Return raw data including last_refreshed_at etc.
         }
     } catch (cacheError) {
         console.error(`Unexpected error checking cache for ${login}:`, cacheError);
@@ -136,38 +192,51 @@ async function fetchUserFromAPI(login) {
             headers: { Authorization: `Bearer ${token}` },
         })
     );
+    // Basic validation of API response structure
+    if (!apiResponse || !apiResponse.data || !apiResponse.data.login) {
+        throw new Error(`Invalid API response structure received for user ${login}`);
+    }
     return apiResponse.data;
 }
 
 /**
- * Upserts user data into the Supabase cache asynchronously.
- * Does not wait for completion and logs errors.
+ * Upserts FULL user data into the Supabase cache.
+ * Waits for completion and throws error on failure.
  * @param {object} userData - User data fetched from the 42 API.
+ * @returns {Promise<void>}
+ * @throws {Error} - If Supabase upsert fails.
  */
-function upsertUserToCache(userData) {
+async function upsertUserToCache(userData) {
+    console.log(`Upserting user ${userData.login} to cache.`);
+    // Ensure we have the necessary fields from the API data
+    if (!userData || !userData.login) {
+        console.error("Attempted to upsert invalid user data:", userData);
+        throw new Error("Invalid user data provided for caching.");
+    }
+
     const dataToUpsert = {
         login: userData.login,
         displayname: userData.displayname,
         email: userData.email,
-        image_url: userData.image?.link, // Store the direct link
+        image_url: userData.image?.link, // Store the direct link from API structure
         wallet: userData.wallet,
         correction_points: userData.correction_point,
         cursus_users: userData.cursus_users,
         projects_users: userData.projects_users,
+        // Add any other relevant fields from the full API response here
         last_refreshed_at: new Date().toISOString(),
     };
 
-    // Perform upsert in background
-    supabase
+    // Remove undefined fields to avoid Supabase issues
+    Object.keys(dataToUpsert).forEach(key => dataToUpsert[key] === undefined && delete dataToUpsert[key]);
+
+    const { error: upsertError } = await supabase
         .from('users_cache')
-        .upsert(dataToUpsert, { onConflict: 'login' })
-        .then(({ error: upsertError }) => {
-            if (upsertError) {
-                console.error(`Supabase background upsert error for ${userData.login}:`, upsertError.message);
-            } else {
-                console.log(`Successfully upserted ${userData.login} in background.`);
-            }
-        });
+        .upsert(dataToUpsert, { onConflict: 'login' }); // Use login as the conflict target
+
+    if (upsertError) {
+        console.error(`Supabase upsert error for ${userData.login}:`, upsertError.message);
+        throw new Error(`Failed to update cache for user ${userData.login}.`);
+    }
+    console.log(`Successfully upserted ${userData.login}.`);
 }
-
-

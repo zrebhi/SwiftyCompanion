@@ -13,8 +13,9 @@ const SUPABASE_SERVICE_KEY = process.env.SUPABASE_SERVICE_KEY; // Use service ke
 const CLIENT_ID = process.env.CLIENT_ID;
 const CLIENT_SECRET = process.env.CLIENT_SECRET;
 const API_BASE_URL = "https://api.intra.42.fr/v2";
-const CAMPUS_ID = 1; // Target Campus ID (e.g., 9 for Lyon). ADJUST AS NEEDED!
-const RATE_LIMIT_DELAY_MS = 550; // Delay between individual user API calls (ms)
+const API_PAGE_FETCH_DELAY_MS = 550; // Delay between 42 API page fetches (ms)
+const UPSERT_BATCH_SIZE = 100; // Number of users to upsert in a single batch
+const BATCH_DELAY_MS = 200; // Optional delay between Supabase batch upserts (ms)
 
 // --- Initialization ---
 // Validate environment variables
@@ -24,34 +25,36 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_KEY || !CLIENT_ID || !CLIENT_SECRET) {
   );
   process.exit(1);
 }
-// Initialize Supabase client
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_KEY);
+// Initialize PostgreSQL client
+const { Client } = require('pg');
+const client = new Client({
+  connectionString: process.env.DATABASE_URL,
+  ssl: { rejectUnauthorized: false }
+});
 
 // --- Helper Functions ---
 
 /**
- * Fetches all active, non-alumni user logins for a specific primary campus using pagination.
- * @param {number} campusId - The ID of the primary campus to filter by.
- * @returns {Promise<string[]>} - A list of user logins.
+ * Fetches all active user logins using pagination.
+ * Returns the basic user data directly from the list endpoint.
+ * @returns {Promise<object[]>} - A list of user objects containing basic info.
  */
-async function fetchAllUserLogins(campusId) {
-  let allLogins = [];
-  let page = 1;
-  const perPage = 100;
+async function fetchAllUserLogins() { 
+ let allUsers = [];
+ let page = 1;
+ const perPage = 100;
 
-  console.log(
-    `Fetching logins for primary campus ${campusId} from ${API_BASE_URL}/users ...`
-  );
+ console.log(
+   `Fetching all active user logins from ${API_BASE_URL}/users ...` // Updated log
+ );
 
-  while (true) {
-    try {
-      const token = await tokenManager.getValidToken();
-      const params = new URLSearchParams({
-        "filter[primary_campus_id]": campusId,
-        // "filter[active]": 'true', // Filter active users client-side for reliability
-        "page[number]": page,
-        "page[size]": perPage,
-      });
+ while (true) {
+   try {
+     const token = await tokenManager.getValidToken();
+     const params = new URLSearchParams({
+       "page[number]": page,
+       "page[size]": perPage,
+     });
       const url = `${API_BASE_URL}/users?${params.toString()}`;
 
       console.log(`Fetching page ${page}...`);
@@ -66,11 +69,12 @@ async function fetchAllUserLogins(campusId) {
       }
 
       // Filter for active users client-side
-      const activeUsers = usersOnPage.filter(user => user['active?'] === true);
-      const logins = activeUsers.map((user) => user.login);
-      allLogins = allLogins.concat(logins);
+      const activeUsers = usersOnPage.filter(
+        (user) => user["active?"] === true
+      );
+      allUsers = allUsers.concat(activeUsers);
       console.log(
-        `Fetched ${usersOnPage.length}, added ${logins.length} active. Total collected: ${allLogins.length}`
+        `Fetched ${usersOnPage.length}, added ${activeUsers.length} active. Total collected: ${allUsers.length}`
       );
 
       if (usersOnPage.length < perPage) {
@@ -78,12 +82,25 @@ async function fetchAllUserLogins(campusId) {
         break;
       }
       page++;
-      // Optional delay between page fetches if needed
-      // await new Promise(resolve => setTimeout(resolve, 100));
+      // Apply delay before fetching the next page to respect rate limits
+      if (API_PAGE_FETCH_DELAY_MS > 0) {
+        console.log(
+          `--- Delaying ${API_PAGE_FETCH_DELAY_MS}ms before next API page fetch ---`
+        );
+        await new Promise((resolve) =>
+          setTimeout(resolve, API_PAGE_FETCH_DELAY_MS)
+        );
+      }
     } catch (error) {
-      console.error(`Error fetching page ${page}:`, error.response?.status, error.message);
+      console.error(
+        `Error fetching page ${page}:`,
+        error.response?.status,
+        error.message
+      );
       if (error.response?.status === 429) {
-        console.log("Rate limited (429) fetching user list page. Waiting 1s...");
+        console.log(
+          "Rate limited (429) fetching user list page. Waiting 1s..."
+        );
         await new Promise((resolve) => setTimeout(resolve, 1000));
         // Retry same page
       } else {
@@ -92,130 +109,70 @@ async function fetchAllUserLogins(campusId) {
       }
     }
   }
-  console.log(`Finished fetching logins. Total collected: ${allLogins.length}`);
-  return allLogins;
+  console.log(
+    `Finished fetching user list. Total collected: ${allUsers.length}`
+  );
+  return allUsers;
 }
 
 /**
- * Maps raw 42 API user data to the Supabase table schema.
- * @param {object} userData - Raw data object from 42 API /v2/users/{login}.
- * @returns {object} - Data object ready for Supabase upsert.
+ * Iterates through user objects, prepares basic data, and upserts them in batches.
+ * @param {object[]} users - Array of user objects from fetchAllUserLogins.
  */
-function prepareDataForUpsert(userData) {
-    return {
-        login: userData.login,
-        displayname: userData.displayname,
-        email: userData.email,
-        image_url: userData.image?.link, // Use optional chaining
-        wallet: userData.wallet,
-        correction_points: userData.correction_point,
-        // location field removed
-        cursus_users: userData.cursus_users,
-        projects_users: userData.projects_users,
-        last_refreshed_at: new Date().toISOString(),
-    };
-}
+async function processUsersBatch(users) {
+  const totalUsers = users.length;
+  let batch = [];
+  console.log(`\nStarting batch upsert process for ${totalUsers} users...`);
 
-/**
- * Processes a single login: checks cache, fetches API if needed, upserts data.
- * @param {string} login - The user login to process.
- * @returns {Promise<boolean>} - True if an API call was attempted, false otherwise.
- */
-async function processSingleLogin(login) {
-    let existingUser = null;
-    let selectError = null;
-    let apiCallAttempted = false;
-
-    try {
-      // Check cache first
-      ({ data: existingUser, error: selectError } = await supabase
-        .from("users_cache")
-        .select("login") // Check existence only
-        .eq("login", login)
-        .maybeSingle());
-
-      if (selectError) {
-        console.error(`DB check error for ${login}: ${selectError.message}. Skipping.`);
-        return false; // Indicate no API call needed/attempted
-      }
-
-      if (existingUser) {
-        // Log skip, return false as no API call needed
-        return false;
-      }
-
-      // --- User not in cache, fetch from API ---
-      apiCallAttempted = true; // Mark API call attempt
-      const token = await tokenManager.getValidToken();
-      const userUrl = `${API_BASE_URL}/users/${login}`;
-
-      const response = await axios.get(userUrl, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const userData = response.data;
-
-      // Prepare and Upsert data
-      const dataToUpsert = prepareDataForUpsert(userData);
-      const { error: upsertError } = await supabase
-        .from("users_cache")
-        .upsert(dataToUpsert, { onConflict: "login" });
-
-      if (upsertError) {
-        console.error(`DB upsert error for ${login}: ${upsertError.message}.`);
-        // Logged error, but still count as processed for progress
-      } else {
-        // Log success only if upsert was successful
-        // console.log(`---> User ${login} successfully fetched and upserted.`);
-      }
-
-    } catch (error) {
-      // Handle API fetch errors
-      console.error(`API fetch/processing error for ${login}:`, error.response?.status, error.message);
-      if (error.response?.status === 429) {
-        console.log(`Rate limited (429) processing ${login}. Will retry after delay.`);
-        // Let the main loop handle the delay based on apiCallAttempted flag
-      } else if (error.response?.status === 404) {
-        console.warn(`User ${login} not found (404) during API fetch. Skipping.`);
-        // No need to retry, but API call was attempted
-      } else {
-        // Log other unexpected errors
-        console.error(`Unexpected error for ${login}. Skipping.`);
-      }
-    }
-    // Return whether an API call was attempted (important for delay logic)
-    return apiCallAttempted;
-}
-
-
-/**
- * Iterates through logins, processes each, and handles rate limiting.
- * @param {string[]} logins - Array of user logins to process.
- */
-async function processAllLogins(logins) {
-  const totalLogins = logins.length;
-  for (let i = 0; i < totalLogins; i++) {
-    const login = logins[i];
+  for (let i = 0; i < totalUsers; i++) {
+    const user = users[i];
     const currentCount = i + 1;
 
-    console.log(`[${currentCount}/${totalLogins}] Processing ${login}...`);
+    // Prepare data object for upsert, matching Supabase schema columns
+    // Only include fields available directly from the /v2/users list endpoint
+    const userData = {
+      login: user.login, // Primary Key
+      displayname: user.displayname,
+      // Use image.link if available, otherwise null or a default/placeholder
+      image_url: user.image?.link || user.image?.versions?.small || null,
+      last_refreshed_at: new Date().toISOString(),
+    };
 
-    const apiCallMade = await processSingleLogin(login);
+    batch.push(userData);
 
-    if (apiCallMade) {
-       console.log(`---> Processed ${login} (API call made).`);
-       // Apply delay only if an API call was attempted and it's not the last user
-       if (currentCount < totalLogins) {
-           console.log(`--- Delaying ${RATE_LIMIT_DELAY_MS}ms ---`);
-           await new Promise((resolve) => setTimeout(resolve, RATE_LIMIT_DELAY_MS));
-       }
-    } else {
-        // Log skips clearly
-        console.log(`---> Skipped ${login} (already cached or error during check).`);
+    // If batch is full or it's the last user, upsert the batch
+    if (batch.length >= UPSERT_BATCH_SIZE || currentCount === totalUsers) {
+      console.log(
+        `[${currentCount}/${totalUsers}] Upserting batch of ${batch.length} users...`
+      );
+      try {
+        // Upsert based on the 'login' primary key
+        const { error } = await supabase.from("users_cache").upsert(batch, {
+          onConflict: "login", // Correct conflict target based on schema
+          // ignoreDuplicates: false // default is false, upsert will update existing rows
+        });
+
+        if (error) {
+          console.error(`Supabase upsert error: ${error.message}`);
+          // Decide if you want to stop or continue on batch error
+        } else {
+          console.log(`---> Batch upsert successful.`);
+        }
+        // Clear the batch
+        batch = [];
+        // Optional delay between batches
+        if (currentCount < totalUsers && BATCH_DELAY_MS > 0) {
+          console.log(`--- Delaying ${BATCH_DELAY_MS}ms before next batch ---`);
+          await new Promise((resolve) => setTimeout(resolve, BATCH_DELAY_MS));
+        }
+      } catch (err) {
+        console.error("Unexpected error during Supabase batch upsert:", err);
+        // Decide how to handle unexpected errors
+      }
     }
   }
-  console.log(`Finished processing loop for ${totalLogins} logins.`);
+  console.log(`Finished processing loop for ${totalUsers} users.`);
 }
-
 
 // --- Main Script Logic ---
 async function main() {
@@ -229,30 +186,26 @@ async function main() {
 
     // --- Step 1: Fetch all relevant user logins ---
     console.log(
-      `Fetching list of active user logins for campus ${CAMPUS_ID}...`
+      `Fetching list of all active user logins...` // Updated log
     );
     // *** Call fetchAllUserLogins ***
-    const allLogins = await fetchAllUserLogins(CAMPUS_ID);
-    console.log(`Found ${allLogins.length} active logins to process.`);
+    const allUsers = await fetchAllUserLogins();
+    console.log(`Found ${allUsers.length} active users to process.`); // Updated log
 
-    if (allLogins.length === 0) {
-      console.log("No logins found. Exiting.");
+    if (allUsers.length === 0) {
+      console.log("No active users found. Exiting."); // Updated log
       return;
     }
 
-    // --- Step 2: Fetch full details and upsert to Supabase ---
-    // Log the count clearly before starting the potentially long process
-    console.log(
-      `\n---> Ready to fetch full details for ${
-        allLogins.length
-      } users. This may take approximately ${Math.ceil(
-        (allLogins.length * RATE_LIMIT_DELAY_MS) / 1000 / 60
-      )} minutes.`
-    );
+    // --- Step 2: Process users and upsert basic info to Supabase in batches ---
+    // Estimate time based on batches and delay
+    const estimatedBatches = Math.ceil(allUsers.length / UPSERT_BATCH_SIZE);
+    const estimatedTimeMinutes = Math.ceil((estimatedBatches * BATCH_DELAY_MS) / 1000 / 60);
+    // Updated log to reflect batch processing and remove old delay constant
+    console.log(`\n---> Ready to process ${allUsers.length} users in batches of ${UPSERT_BATCH_SIZE}. Estimated time: ~${estimatedTimeMinutes} minutes (excluding API fetch time).`);
 
-    console.log("\nStarting detail fetching and upsert process...");
-    // *** Call processAllLogins ***
-    await processAllLogins(allLogins);
+    // *** Call processUsersBatch ***
+    await processUsersBatch(allUsers); // Call the new function with user objects
 
     console.log("\nCache population script finished successfully.");
   } catch (error) {

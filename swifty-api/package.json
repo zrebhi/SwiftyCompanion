@@ -2,8 +2,9 @@
   "name": "swifty-api",
   "version": "1.0.0",
   "dependencies": {
+    "@supabase/supabase-js": "^2.49.4",
     "axios": "latest",
-    "vercel": "latest",
-    "@supabase/supabase-js": "latest"
+    "dotenv": "^16.5.0",
+    "vercel": "latest"
   }
 }
