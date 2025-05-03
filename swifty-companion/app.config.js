@@ -9,12 +9,10 @@ export default {
   newArchEnabled: true,
 
   extra: {
-    CLIENT_ID: process.env.CLIENT_ID,
-    CLIENT_SECRET: process.env.CLIENT_SECRET,
     IP_ADDRESS: process.env.IP_ADDRESS || "localhost",
     PROJECT_LOCAL_API: process.env.PROJECT_LOCAL_API || "FALSE",
     PROJECT_LOCAL_API_PORT: process.env.PROJECT_LOCAL_API_PORT || 3000,
-    PROJECT_API_URL: process.env.PROJECT_API_URL || "https://https://swifty-api.vercel.app/",
+    PROJECT_API_URL: process.env.PROJECT_API_URL || "https://swifty-api.vercel.app/",
     eas: {
       projectId: "6b82f6c9-afb7-467f-ade4-ede7ace16ecf",
     },

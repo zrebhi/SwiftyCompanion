@@ -45,7 +45,7 @@ const SearchSuggestions = ({
       ) : (
         <FlatList
           data={suggestions}
-          keyExtractor={(item) => item.id.toString()}
+          keyExtractor={(item) => item.login}
           renderItem={({ item }) => (
             <SuggestionItem
               suggestion={item}

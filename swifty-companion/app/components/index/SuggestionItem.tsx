@@ -55,6 +55,7 @@ const SuggestionItem = ({
         <Image
           source={{ uri: suggestion.image?.versions?.small }}
           style={styles.avatar}
+          defaultSource={require('../../../assets/images/42_logo_white.png')} // Add default placeholder
         />
         <View style={styles.textContainer}>
           {renderHighlightedText(suggestion.login, searchQuery)}
