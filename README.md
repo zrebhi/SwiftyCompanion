@@ -38,7 +38,7 @@ You can run SwiftyCompanion directly on your device using the Expo Go app:
 <details>
 <summary>📱 Click to show QR code</summary>
 
-<img src="https://qr.expo.dev/eas-update?slug=exp&projectId=6b82f6c9-afb7-467f-ade4-ede7ace16ecf&groupId=462b0b66-896f-426a-bf25-0e04f3e9a14d&host=u.expo.dev"></img>
+<img src="https://qr.expo.dev/eas-update?slug=exp&projectId=6b82f6c9-afb7-467f-ade4-ede7ace16ecf&groupId=5f856d07-1137-4402-a95a-cfe2431d4ad7&host=u.expo.dev"></img>
 
 </details>
 
