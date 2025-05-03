@@ -34,8 +34,8 @@ class TokenManager {
 
     const data = new URLSearchParams();
     data.append("grant_type", "client_credentials");
-    data.append("client_id", clientId);
-    data.append("client_secret", clientSecret);
+    data.append("client_id", clientId); // API expects lowercase 'client_id'
+    data.append("client_secret", clientSecret); // API expects lowercase 'client_secret'
 
     const response = await axios.post(
       "https://api.intra.42.fr/oauth/token",

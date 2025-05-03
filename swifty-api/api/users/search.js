@@ -1,137 +1,183 @@
 // swifty-api/api/users/search.js
-const { createClient } = require("@supabase/supabase-js");
+const { Pool } = require("pg"); // Use Pool instead of Client
 const { performance } = require("perf_hooks"); // For timing queries
 
-// Initialize Supabase client
-const SUPABASE_URL = process.env.SUPABASE_URL;
-const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY;
+// Initialize PostgreSQL Pool Configuration
+const DATABASE_URL = process.env.DATABASE_URL;
 
-if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
-  console.error("API Search Error: Missing Supabase environment variables.");
-  // We should probably throw here or ensure supabase is not used if null
+if (!DATABASE_URL) {
+  console.error("API Search Error: Missing DATABASE_URL environment variable.");
 }
-const supabase =
-  SUPABASE_URL && SUPABASE_ANON_KEY
-    ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY)
-    : null;
+
+// Configure the PostgreSQL Pool
+// Uses PostgreSQL Pool for database connections.
+// --- Certificate Loading ---
+// Read certificate content from environment variable for Vercel deployment & local consistency
+const caCertContent = process.env.SSL_CERT || null;
+
+if (!caCertContent) {
+  // Log an error if the env var is missing, critical for production/local if file reading is removed
+  console.error("API Search Error: SSL_CERT environment variable is not set.");
+} else {
+  console.log(
+    "Using Aiven CA certificate from environment variable for search.js."
+  );
+}
+
+// --- Clean Connection String ---
+// Remove potentially conflicting sslmode from the DATABASE_URL before passing to Pool config
+let cleanConnectionString = DATABASE_URL;
+if (DATABASE_URL) {
+  try {
+    const url = new URL(DATABASE_URL);
+    url.searchParams.delete("sslmode"); // Remove sslmode parameter
+    // url.searchParams.delete('sslrootcert'); // Example if other params needed removal
+    cleanConnectionString = url.toString();
+    if (cleanConnectionString !== DATABASE_URL) {
+      console.log("Removed sslmode from connection string for search.js.");
+    }
+  } catch (e) {
+    console.error("Error parsing DATABASE_URL:", e);
+    // Proceed with original URL, might still fail
+    cleanConnectionString = DATABASE_URL;
+  }
+}
+
+// --- Initialize Connection Pool ---
+// Create ONE pool instance per function instance (Vercel manages this)
+const pool = cleanConnectionString
+  ? new Pool({
+      connectionString: cleanConnectionString, // Use the cleaned string
+      // Configure SSL only if the certificate content is available from the env var
+      ssl: caCertContent
+        ? {
+            ca: caCertContent,
+            // rejectUnauthorized defaults to true, which is correct when providing a CA
+          }
+        : undefined, // If no CA cert, rely on system CAs (likely fails with Aiven PG) or connection fails
+      // Add pool options here if needed (e.g., max, idleTimeoutMillis)
+      // connectionTimeoutMillis: 2000, // default
+    })
+  : null;
+
+// No need to explicitly connect the pool here. It connects on first query.
 
 const MAX_SUGGESTIONS = 10;
-const TIER_FETCH_LIMIT = 20; // Fetch slightly more for contains tiers to allow filtering
+// MAX_SUGGESTIONS limits the total results returned.
 
 /**
  * Performs a tiered search for user suggestions based on a search term.
  *
  * @async
- * @param {object} supabase - Initialized Supabase client instance.
+ * @param {object} pool - Initialized pg.Pool instance.
  * @param {string} searchTerm - The term to search for.
  * @param {number} maxSuggestions - The maximum number of suggestions to return.
- * @param {number} tierFetchLimit - The limit for fetching results in 'contains' tiers.
  * @returns {Promise<Array<object>>} A promise that resolves to an array of suggestion objects.
  */
-async function sortSearchSuggestions(supabase, searchTerm, maxSuggestions, tierFetchLimit) {
-  let finalSuggestions = [];
-  const includedLogins = new Set(); // Use login (primary key) for deduplication
+async function sortSearchSuggestions(pool, searchTerm, maxSuggestions) {
+  if (!pool) {
+    console.error(
+      "sortSearchSuggestions Error: PostgreSQL Pool not initialized."
+    );
+    return [];
+  }
 
-  // Helper to add unique suggestions and update included logins
-  const addSuggestions = (newSuggestions) => {
-    if (!newSuggestions || newSuggestions.length === 0) return;
-    for (const user of newSuggestions) {
-      if (finalSuggestions.length >= maxSuggestions) break;
-      if (user && user.login != null && !includedLogins.has(user.login)) {
-        finalSuggestions.push({
-          login: user.login,
-          displayname: user.displayname,
-          image: { versions: { small: user.image_url || null } },
-        });
-        includedLogins.add(user.login);
-      }
+  const tierStartTime = performance.now();
+  try {
+    // Use CTEs (WITH clauses) and ROW_NUMBER() to rank and limit per tier
+    const sql = `
+      WITH RankedUsers AS (
+        -- First CTE: Calculate the rank for each user based on search term match type
+        SELECT
+          login,
+          displayname,
+          image_url,
+          CASE
+            WHEN login ILIKE $1 THEN 1       -- Tier 1: Login starts with
+            WHEN displayname ILIKE $1 THEN 2 -- Tier 2: DisplayName starts with
+            WHEN login ILIKE $2 THEN 3       -- Tier 3: Login contains
+            WHEN displayname ILIKE $2 THEN 4 -- Tier 4: DisplayName contains
+            ELSE 5                          -- Should not happen with WHERE clause, but good practice
+          END as rank
+        FROM
+          users_cache
+        WHERE
+          login ILIKE $2 OR displayname ILIKE $2 -- Pre-filter: Only consider users matching the 'contains' criteria
+      ),
+      NumberedUsers AS (
+        -- Second CTE: Assign a row number within each rank group, ordered appropriately
+        SELECT
+          login,
+          displayname,
+          image_url,
+          rank,
+          ROW_NUMBER() OVER (
+            PARTITION BY rank -- Reset numbering for each rank group
+            ORDER BY
+              -- Define the secondary sort order within each rank partition
+              CASE rank
+                WHEN 1 THEN login
+                WHEN 2 THEN displayname
+                WHEN 3 THEN login
+                WHEN 4 THEN displayname
+                ELSE login
+              END ASC
+          ) as rn -- rn is the row number within the rank group
+        FROM RankedUsers
+      )
+      -- Final Selection: Get users where row number within rank is <= 5,
+      -- then sort by overall rank and apply the final overall limit.
+      SELECT
+        login,
+        displayname,
+        image_url
+      FROM NumberedUsers
+      WHERE rn <= 5 -- Limit to top 5 within each rank
+      ORDER BY
+        rank ASC, -- Primary sort: by overall rank
+        rn ASC    -- Secondary sort: by row number within rank (maintains secondary alpha sort)
+      LIMIT $3;     -- Apply the overall maximum suggestion limit
+    `;
+
+    // Parameters for the query: $1 = startsWith, $2 = contains, $3 = overall limit
+    const params = [`${searchTerm}%`, `%${searchTerm}%`, maxSuggestions];
+
+    // Debug logs:
+    // console.log(`Executing RowNumber Search SQL: ${sql.replace(/\s+/g, ' ').trim()}`);
+    // console.log(`Params: ${JSON.stringify(params)}`);
+    // Get a client from the pool, execute query, release client
+    const client = await pool.connect();
+    let rows;
+    try {
+      ({ rows } = await client.query(sql, params));
+    } finally {
+      client.release(); // IMPORTANT: Release client back to pool
     }
-  };
-
-  // Helper to execute a tier query and handle errors/logging
-  const executeTierQuery = async (queryBuilder, tierName) => {
-    const tierStartTime = performance.now();
-    const loginsToExclude = Array.from(includedLogins);
-    if (loginsToExclude.length > 0) {
-      const formattedLogins = `(${loginsToExclude
-        .map((login) => `'${login.replace(/'/g, "''")}'`)
-        .join(",")})`;
-      queryBuilder = queryBuilder.not("login", "in", formattedLogins);
-    }
-
-    const { data, error } = await queryBuilder;
     const tierEndTime = performance.now();
+
     console.log(
-      `Tier ${tierName} query took ${(
-        (tierEndTime - tierStartTime) / 1000
-      ).toFixed(3)}s, found ${data?.length || 0}`
+      `RowNumber search query took ${(
+        (tierEndTime - tierStartTime) /
+        1000
+      ).toFixed(3)}s, found ${rows?.length || 0} results for '${searchTerm}'`
     );
 
-    if (error) {
-      console.error(
-        `Supabase error in Tier ${tierName} for query '${searchTerm}':`,
-        error.message
-      );
-      return [];
-    }
-    return data || [];
-  };
+    // Map results to the expected frontend format
+    const finalSuggestions = (rows || []).map((user) => ({
+      login: user.login,
+      displayname: user.displayname,
+      image: { versions: { small: user.image_url || null } },
+    }));
 
-  // --- Tier 1: Login Starts With ---
-  if (finalSuggestions.length < maxSuggestions) {
-    const tier1Query = supabase
-      .from("users_cache")
-      .select("login, displayname, image_url")
-      .ilike("login", `${searchTerm}%`)
-      .order("login", { ascending: true })
-      .limit(5);
-    const tier1Results = await executeTierQuery(tier1Query, "1 (Login StartsWith)");
-    addSuggestions(tier1Results);
+    return finalSuggestions;
+  } catch (error) {
+    console.error(
+      `PostgreSQL error during row_number search for '${searchTerm}':`,
+      error.message
+    );
+    return []; // Return empty array on error
   }
-
-  // --- Tier 2: DisplayName Starts With ---
-  if (finalSuggestions.length < maxSuggestions) {
-    const tier2Query = supabase
-      .from("users_cache")
-      .select("login, displayname, image_url")
-      .ilike("displayname", `${searchTerm}%`)
-      .order("displayname", { ascending: true })
-      .limit(5);
-    const tier2Results = await executeTierQuery(tier2Query, "2 (DisplayName StartsWith)");
-    addSuggestions(tier2Results);
-  }
-
-  // --- Tier 3: Login Contains ---
-  if (finalSuggestions.length < maxSuggestions) {
-    const tier3Query = supabase
-      .from("users_cache")
-      .select("login, displayname, image_url")
-      .ilike("login", `%${searchTerm}%`)
-      // Removed: .like("login", "[a-zA-Z]%")
-      .order("login", { ascending: true })
-      .limit(tierFetchLimit);
-    const tier3Results = await executeTierQuery(tier3Query, "3 (Login Contains)"); // Updated tier name
-    addSuggestions(tier3Results);
-  }
-
-  // --- Tier 4: DisplayName Contains ---
-  if (finalSuggestions.length < maxSuggestions) {
-    const tier4Query = supabase
-      .from("users_cache")
-      .select("login, displayname, image_url")
-      .ilike("displayname", `%${searchTerm}%`)
-      // Removed: .like("displayname", "[a-zA-Z]%")
-      .order("displayname", { ascending: true })
-      .limit(tierFetchLimit);
-    const tier4Results = await executeTierQuery(tier4Query, "4 (DisplayName Contains)"); // Updated tier name
-    addSuggestions(tier4Results);
-  }
-
-  // Removed Tier 3b and 4b
-
-  return finalSuggestions;
 }
-
 
 /**
  * Serverless API endpoint handler for searching users in the cache using tiered logic.
@@ -144,7 +190,7 @@ async function sortSearchSuggestions(supabase, searchTerm, maxSuggestions, tierF
  */
 module.exports = async (req, res) => {
   // Set CORS headers
-  res.setHeader("Access-Control-Allow-Origin", "*"); // Adjust in production
+  res.setHeader("Access-Control-Allow-Origin", "*"); // TODO: Restrict in production
   res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type");
 
@@ -159,11 +205,14 @@ module.exports = async (req, res) => {
     return res.status(405).json({ error: "Method Not Allowed" });
   }
 
-  // Check if Supabase client initialized correctly
-  if (!supabase) {
-    console.error("API Search Error: Supabase client not initialized.");
+  // Check if Pool initialized correctly
+  if (!pool) {
+    console.error(
+      "API Search Error: PostgreSQL Pool not initialized (DATABASE_URL missing?)."
+    );
     return res.status(500).json({ error: "Server configuration error." });
   }
+  // No need to connect pool explicitly here
 
   const { q } = req.query;
 
@@ -174,24 +223,24 @@ module.exports = async (req, res) => {
       .json({ error: "Missing or empty query parameter 'q'." });
   }
 
-  const searchTerm = q.trim();
+  const searchTerm = q.trim().toLowerCase(); // Normalize search term
   const startTime = performance.now();
 
   try {
-    console.log(`Tiered search initiated for: '${searchTerm}'`);
+    // console.log(`Search initiated for: '${searchTerm}'`);
 
-    // Call the extracted function to get suggestions
+    // Call the refactored function with the pool
     const finalSuggestions = await sortSearchSuggestions(
-      supabase,
+      pool,
       searchTerm,
-      MAX_SUGGESTIONS,
-      TIER_FETCH_LIMIT
+      MAX_SUGGESTIONS
     );
 
     const endTime = performance.now();
     console.log(
       `Found ${finalSuggestions.length} suggestions for '${searchTerm}' in ${(
-        (endTime - startTime) / 1000
+        (endTime - startTime) /
+        1000
       ).toFixed(3)}s`
     );
     return res.status(200).json(finalSuggestions);

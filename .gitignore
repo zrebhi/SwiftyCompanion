@@ -27,6 +27,7 @@ yarn-error.log*
 
 # Misc
 swifty-api/tests
-.*
-roo_config
+.*/
+*roo*
 .gitignore
+memory-bank
